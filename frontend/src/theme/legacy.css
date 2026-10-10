@@ -1,0 +1,623 @@
+/* 设置与用量页沿用的全局类名，改用玻璃设计变量。对话、记忆等新页面使用 CSS Modules。 */
+
+.glass,
+.settings-card,
+.usage-stat-card,
+.usage-card,
+.empty-card {
+  background: rgba(var(--glass-rgb), var(--glass-alpha));
+  box-shadow: inset 0 0 0 1px var(--ring);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+}
+
+/* :where 让这些默认样式的优先级为 0，组件里的 CSS Modules 类可以直接覆盖 */
+:where(input, textarea, select) {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: var(--track);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink);
+  outline: none;
+}
+
+:where(input[type="checkbox"], input[type="radio"], input[type="range"]) {
+  width: auto;
+  padding: 0;
+  box-shadow: none;
+  accent-color: var(--accent);
+}
+
+:where(input, textarea, select):focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+
+textarea {
+  resize: vertical;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* 页面容器 */
+.settings-panel,
+.usage-panel {
+  padding: 8px 14px 32px;
+}
+
+.panel-head {
+  max-width: 1100px;
+  margin: 0 auto 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+}
+
+.panel-head h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.panel-head p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+/* 状态点 */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
+
+.status-ready .status-dot {
+  background: var(--ok);
+}
+
+.status-warning .status-dot {
+  background: #c9902f;
+}
+
+/* 按钮 */
+.ghost-button,
+.small-button,
+.tiny-button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--track);
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.small-button.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.tiny-button {
+  min-height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.link-button {
+  border: none;
+  background: transparent;
+  color: var(--accent-ink);
+  padding: 0 0 0 6px;
+  font-size: 12px;
+}
+
+.filter {
+  min-height: 32px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--track);
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.filter.active {
+  background: var(--knob);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* 提示条 */
+.chat-hint {
+  text-align: center;
+  color: var(--ink-2);
+  padding: 20px 0;
+  font-size: 13px;
+}
+
+.error-banner,
+.success-banner {
+  margin: 14px 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.error-banner {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+}
+
+.success-banner {
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  color: var(--ok);
+}
+
+.empty-card {
+  max-width: 1100px;
+  margin: 20px auto;
+  padding: 30px;
+  text-align: center;
+  color: var(--ink-2);
+  border-radius: var(--radius-card);
+}
+
+/* 设置卡片 */
+.settings-card {
+  max-width: 1100px;
+  margin: 0 auto 14px;
+  padding: 18px;
+  border-radius: var(--radius-card);
+}
+
+.settings-card h3 {
+  margin: 0 0 14px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+
+.field small {
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+}
+
+.inline-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.tool-hint {
+  margin-top: 10px;
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.settings-actions {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.agent-warning {
+  color: #b7791f;
+}
+
+.agent-test-result {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--track);
+}
+
+.agent-test-meta {
+  color: var(--ink-2);
+  font-size: 11px;
+  margin-bottom: 7px;
+}
+
+.agent-test-result pre {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.voice-status,
+.wechat-status {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.wechat-status {
+  margin-bottom: 14px;
+}
+
+.voice-status p,
+.wechat-status p,
+.wechat-login-message {
+  margin: 4px 0 0;
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+
+.wechat-error {
+  color: var(--danger);
+}
+
+.wechat-login {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.wechat-login details {
+  width: 100%;
+}
+
+.wechat-login summary {
+  cursor: pointer;
+  color: var(--accent-ink);
+  font-size: 12.5px;
+  margin-bottom: 10px;
+}
+
+.wechat-manual {
+  margin-bottom: 12px;
+}
+
+.wechat-qr {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.wechat-qr img {
+  width: 220px;
+  height: 220px;
+  border-radius: var(--radius-control);
+  background: #fff;
+  padding: 8px;
+}
+
+.wechat-qr p,
+.wechat-qr small {
+  color: var(--ink-2);
+  font-size: 12px;
+  max-width: 520px;
+  word-break: break-all;
+}
+
+.wechat-actions {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+}
+
+.proactive-events {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.proactive-events li {
+  display: grid;
+  grid-template-columns: 9em 7em 1fr;
+  gap: 8px;
+  padding: 4px 0;
+  border-top: 1px solid var(--line);
+}
+
+.companion-apps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.companion-observations li {
+  grid-template-columns: 4em 7em 1fr;
+}
+
+/* 用量 */
+.usage-filters {
+  max-width: 1100px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.usage-range {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.usage-filters label {
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: var(--ink-2);
+  font-size: 11px;
+}
+
+.usage-filters select {
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.usage-refresh {
+  margin-left: auto;
+}
+
+.usage-banner {
+  max-width: 1100px;
+  margin: 0 auto 14px;
+}
+
+.usage-summary-grid {
+  max-width: 1100px;
+  margin: 0 auto 14px;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.usage-stat-card,
+.usage-card {
+  border-radius: var(--radius-card);
+}
+
+.usage-stat-card {
+  min-width: 0;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.usage-stat-card > span {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.usage-stat-card strong {
+  color: var(--accent-ink);
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.usage-stat-card small {
+  color: var(--ink-3);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+
+.usage-breakdown-grid {
+  max-width: 1100px;
+  margin: 0 auto 14px;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.usage-card {
+  max-width: 1100px;
+  margin: 0 auto 14px;
+  overflow: hidden;
+}
+
+.usage-breakdown-grid .usage-card {
+  width: 100%;
+  margin: 0;
+}
+
+.usage-card-head {
+  min-height: 52px;
+  padding: 14px 17px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.usage-card-head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.usage-card-head p,
+.usage-card-head > span {
+  margin: 4px 0 0;
+  color: var(--ink-2);
+  font-size: 11px;
+}
+
+.usage-card-head > span {
+  white-space: nowrap;
+}
+
+.usage-table-wrap {
+  overflow-x: auto;
+}
+
+.usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-table th,
+.usage-table td {
+  padding: 10px 13px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.usage-table tr:last-child th,
+.usage-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.usage-table thead th {
+  color: var(--ink-3);
+  background: var(--track);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.usage-table th:first-child {
+  min-width: 180px;
+  text-align: left;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.usage-table code {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-2);
+  font-size: 10.5px;
+}
+
+.usage-provider {
+  color: var(--accent-ink);
+}
+
+.usage-table-empty {
+  padding: 24px 17px;
+  color: var(--ink-2);
+  text-align: center;
+  font-size: 12px;
+}
+
+.usage-error-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.usage-error-row {
+  padding: 13px 17px;
+  border-bottom: 1px solid var(--line);
+}
+
+.usage-error-row:last-child {
+  border-bottom: 0;
+}
+
+.usage-error-meta {
+  display: flex;
+  gap: 9px;
+  flex-wrap: wrap;
+  align-items: center;
+  color: var(--ink-2);
+  font-size: 10.5px;
+}
+
+.usage-status {
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--danger) 13%, transparent);
+  color: var(--danger);
+}
+
+.usage-status.timeout {
+  background: rgba(214, 166, 83, 0.16);
+  color: #9a6a1c;
+}
+
+.usage-error-row p {
+  margin: 8px 0 0;
+  color: var(--ink-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 850px) {
+  .usage-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .usage-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .usage-filters label,
+  .usage-refresh {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .panel-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

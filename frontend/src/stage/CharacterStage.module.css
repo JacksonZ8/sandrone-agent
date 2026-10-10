@@ -1,0 +1,144 @@
+.stage {
+  position: relative;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+
+.figure {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 100%;
+  animation: breathe 4.8s ease-in-out infinite;
+}
+
+.head,
+.body {
+  position: absolute;
+  left: 50%;
+  background: var(--figure);
+}
+
+.head {
+  border-radius: 50% 50% 46% 46%;
+}
+
+.body {
+  border-radius: 48% 48% 0 0;
+}
+
+.avatar {
+  border-radius: 50%;
+  background: rgba(var(--glass-rgb), var(--glass-alpha));
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.avatar .head {
+  top: 18%;
+  width: 43%;
+  height: 48%;
+  transform: translateX(-50%);
+}
+
+.avatar .body {
+  top: 61%;
+  width: 86%;
+  height: 54%;
+  transform: translateX(-50%);
+}
+
+.hero {
+  width: 200px;
+  height: 250px;
+}
+
+.hero .head {
+  top: 0;
+  width: 92px;
+  height: 104px;
+  margin-left: -46px;
+}
+
+.hero .body {
+  top: 92px;
+  width: 190px;
+  height: 160px;
+  margin-left: -95px;
+}
+
+.full {
+  width: min(300px, 78vw);
+  aspect-ratio: 300 / 470;
+}
+
+.full .head {
+  top: 10%;
+  width: 44%;
+  height: 32%;
+  transform: translateX(-50%);
+}
+
+.full .body {
+  top: 38%;
+  width: 90%;
+  height: 64%;
+  transform: translateX(-50%);
+}
+
+.stage[data-speaking="true"] .figure {
+  animation:
+    breathe 4.8s ease-in-out infinite,
+    sway 2.4s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -2px;
+  }
+}
+
+@keyframes sway {
+  0%,
+  100% {
+    rotate: -0.6deg;
+  }
+  50% {
+    rotate: 0.6deg;
+  }
+}
+
+/* Live2D 模型自带呼吸与待机动作，不再叠加剪影动画；头像取景由 Live2DView 处理 */
+.stage[data-live2d="true"] {
+  background: none;
+}
+
+.avatar[data-live2d="true"] {
+  background: rgba(var(--glass-rgb), var(--glass-alpha));
+}
+
+/* 逐帧母版与 Live2D 形象是半身像：全屏舞台用更大的正方形 */
+.full[data-live2d="true"] {
+  width: min(560px, 94vw, 62vh);
+  aspect-ratio: 1;
+}
+
+.hero[data-live2d="true"] {
+  width: 260px;
+  height: 260px;
+}
+
+/* 半身像在格子边界被截断：左右与底部柔和渐隐，避免硬切边 */
+.full[data-live2d="true"] canvas,
+.hero[data-live2d="true"] canvas {
+  -webkit-mask-image:
+    linear-gradient(90deg, transparent 0, #000 7%, #000 93%, transparent 100%),
+    linear-gradient(180deg, #000 82%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(90deg, transparent 0, #000 7%, #000 93%, transparent 100%),
+    linear-gradient(180deg, #000 82%, transparent 100%);
+  mask-composite: intersect;
+}

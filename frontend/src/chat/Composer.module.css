@@ -1,0 +1,72 @@
+.composer {
+  padding: 10px 10px 8px 16px;
+  border-radius: var(--radius-sheet);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.composer textarea {
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  resize: none;
+  line-height: 1.6;
+}
+
+.composer textarea:focus-visible {
+  box-shadow: none;
+}
+
+.composer textarea::placeholder {
+  color: var(--ink-3);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.mic:not(:disabled):hover {
+  background: var(--tag);
+  color: var(--accent-ink);
+}
+
+.send {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 4px 14px rgba(20, 35, 50, 0.18);
+  cursor: pointer;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.send:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
+}
+
+.warning {
+  margin-right: 6px;
+  padding: 6px 10px;
+  border-radius: var(--radius-control);
+  background: rgba(214, 166, 83, 0.16);
+  color: var(--ink);
+  font-size: 12px;
+}

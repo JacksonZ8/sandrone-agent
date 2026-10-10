@@ -1,0 +1,213 @@
+.page {
+  width: min(100% - 28px, 720px);
+  margin: 0 auto;
+  padding-bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lead {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.notice {
+  padding: 12px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.game {
+  overflow: hidden;
+}
+
+.head {
+  width: 100%;
+  min-height: 56px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.name {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.progress {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: 12px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail {
+  padding: 4px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detail h3 {
+  margin: 8px 0 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.roles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.role {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.role span {
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.role[aria-checked="true"] {
+  border-color: var(--accent);
+  background: var(--tag);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.check {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.card {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.apps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.apps select {
+  flex: 1;
+  min-width: 180px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sessions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.sessions li + li {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.meta {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.book {
+  width: 100%;
+  max-height: 420px;
+  margin: 8px 0 0;
+  padding: 12px 14px;
+  overflow: auto;
+  border-radius: var(--radius-control);
+  background: var(--track);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.more {
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.more summary {
+  cursor: pointer;
+  color: var(--ink-2);
+}
+
+.apps input {
+  flex: 1;
+  min-width: 180px;
+}
+
+.milestone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.milestone button {
+  margin-left: auto;
+  min-height: 26px;
+  padding: 0 10px;
+}

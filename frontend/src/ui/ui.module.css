@@ -1,0 +1,288 @@
+/* 玻璃基础件：卡片、底板、分段控件、圆形按钮、开关行。 */
+
+.glass {
+  background: rgba(var(--glass-rgb), var(--glass-alpha));
+  box-shadow: inset 0 0 0 1px var(--ring);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+}
+
+.card {
+  composes: glass;
+  border-radius: var(--radius-card);
+  padding: 14px 16px;
+}
+
+.lifted {
+  box-shadow:
+    inset 0 0 0 1px var(--ring),
+    var(--shadow-lift);
+}
+
+.sheet {
+  border-radius: var(--radius-sheet);
+  background: var(--sheet);
+  box-shadow:
+    inset 0 0 0 1px var(--ring),
+    0 18px 50px rgba(20, 35, 50, 0.2);
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+}
+
+.iconButton {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.iconButton:hover {
+  background: var(--track);
+}
+
+.iconButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.small {
+  width: 36px;
+  height: 36px;
+}
+
+.pill {
+  min-height: 34px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--track);
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pill:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 6px 18px rgba(20, 35, 50, 0.16);
+}
+
+.danger {
+  color: var(--danger);
+}
+
+.segmented {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 3px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--track);
+}
+
+.segment {
+  min-height: 32px;
+  min-width: 44px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--ink-2);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.segment[aria-pressed="true"] {
+  background: var(--knob);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.list {
+  composes: glass;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.row {
+  min-height: 52px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: none;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  text-decoration: none;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.row + .row {
+  box-shadow: 0 -1px 0 var(--line);
+}
+
+.rowText {
+  flex: 1;
+  min-width: 0;
+}
+
+.rowHint {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border-radius: 14px;
+  background: var(--track);
+  box-shadow: inset 0 0 0 1px var(--line);
+  cursor: pointer;
+  transition: background var(--dur-base) var(--ease-out);
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.switch:checked {
+  background: var(--accent);
+}
+
+.switch:checked::after {
+  transform: translateX(18px);
+}
+
+.switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tag {
+  padding: 0 8px;
+  border-radius: var(--radius-chip);
+  background: var(--track);
+  color: var(--ink-2);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.tagAccent {
+  composes: tag;
+  background: var(--tag);
+  color: var(--accent-ink);
+}
+
+.hint {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+
+.error {
+  padding: 10px 14px;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--scrim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  /* 只渐变背景色：遮罩上的 opacity 动画会让子元素的毛玻璃失效 */
+  animation: scrim-in var(--dur-base) var(--ease-out);
+}
+
+.dialog {
+  composes: sheet;
+  width: min(100%, 380px);
+  padding: 22px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: pop var(--dur-base) var(--ease-out) both;
+}
+
+.dialog h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.dialog p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.dialogActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.dialogActions .pill {
+  min-height: 44px;
+  padding: 0 22px;
+  font-size: 15px;
+}
+
+@keyframes scrim-in {
+  from {
+    background-color: transparent;
+  }
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+}

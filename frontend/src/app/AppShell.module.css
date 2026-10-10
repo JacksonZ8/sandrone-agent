@@ -1,0 +1,142 @@
+.shell {
+  height: 100%;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  flex: 0 0 auto;
+  padding: calc(10px + env(safe-area-inset-top)) 8px 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: min(100%, 760px);
+  margin: 0 auto;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.brand {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.32em;
+  padding-left: 0.32em;
+  color: var(--accent);
+}
+
+.status {
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--ink-2);
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.avatar {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+
+.avatar > div {
+  width: 100%;
+  height: 100%;
+}
+
+.balance {
+  width: 44px;
+  flex: 0 0 auto;
+}
+
+.main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.scrollable {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.drawerScrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--scrim);
+  /* 只渐变背景色：遮罩上的 opacity 动画会让子元素的毛玻璃失效 */
+  animation: scrim-in var(--dur-base) var(--ease-out);
+}
+
+.drawer {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 8px;
+  width: min(300px, 82vw);
+  padding: calc(8px + env(safe-area-inset-top)) 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: slide var(--dur-base) var(--ease-out) both;
+}
+
+.drawerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0 8px 8px;
+}
+
+.drawerHead .brand {
+  font-size: 20px;
+}
+
+.navItem {
+  min-height: 48px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  border-radius: 16px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.navItem:hover {
+  background: var(--track);
+}
+
+.navItem[aria-current="page"] {
+  background: var(--tag);
+  color: var(--accent-ink);
+}
+
+@keyframes scrim-in {
+  from {
+    background-color: transparent;
+  }
+}
+
+@keyframes slide {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+}

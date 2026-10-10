@@ -1,0 +1,96 @@
+.page {
+  min-height: 100%;
+  width: min(100% - 24px, 560px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.previewArea {
+  flex: 1;
+  min-height: 160px;
+  padding: 24px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview {
+  width: 100%;
+  padding: 16px 18px;
+  border-radius: 24px;
+}
+
+.sheet {
+  margin-bottom: max(26px, env(safe-area-inset-bottom));
+  padding: 18px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.papers {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.paper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.swatch {
+  width: 100%;
+  aspect-ratio: 3 / 5;
+  border-radius: 12px;
+  background: var(--wall-paint);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.paper[aria-checked="true"] .swatch {
+  box-shadow:
+    0 0 0 2px var(--sheet),
+    0 0 0 4px var(--accent);
+}
+
+.add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--ink-3);
+  color: var(--ink-2);
+}
+
+.customActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.slider {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.slider input {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  accent-color: var(--accent);
+}
+
+.sliderHead {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}

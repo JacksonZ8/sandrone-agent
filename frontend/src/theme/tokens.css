@@ -1,0 +1,158 @@
+/* 设计变量：玻璃风格。壁纸决定一组墨色与玻璃色，模糊与玻璃浓度由外观设置写入。
+   壁纸选择器不限于根元素，壁纸缩略图可直接用 data-wallpaper 取到对应的绘制与墨色。 */
+:root {
+  --font-sans: "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  /* 标题与印记字体随前端打包（@fontsource，按 unicode-range 子集按需加载），不访问第三方字体服务 */
+  --font-display: "Cormorant Garamond", Didot, "Bodoni 72", "Times New Roman", serif;
+  --font-seal: "Noto Serif SC", "Songti SC", serif;
+
+  --radius-chip: 6px;
+  --radius-control: 12px;
+  --radius-card: 22px;
+  --radius-sheet: 26px;
+  --radius-pill: 999px;
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 220ms;
+
+  --glass-alpha: 0.5;
+  --glass-blur: 22px;
+  --shadow-lift: 0 10px 34px rgba(20, 35, 50, 0.1);
+
+  color-scheme: light;
+}
+
+:root,
+[data-wallpaper="mist"] {
+  --wall-paint:
+    radial-gradient(120% 55% at 50% 100%, rgba(255, 255, 255, 0.6), transparent 62%),
+    radial-gradient(70% 40% at 85% 8%, rgba(255, 255, 255, 0.5), transparent 70%),
+    linear-gradient(180deg, #dce6ec 0%, #c6d7e1 38%, #a9c3d2 58%, #bcd0dc 74%, #e3ecf0 100%);
+  --glass-rgb: 255, 255, 255;
+  --sheet: rgba(255, 255, 255, 0.7);
+  --ring: rgba(255, 255, 255, 0.62);
+  --line: rgba(255, 255, 255, 0.55);
+  --mine: rgba(214, 231, 242, 0.62);
+  --track: rgba(30, 50, 70, 0.08);
+  --knob: rgba(255, 255, 255, 0.92);
+  --tag: rgba(63, 115, 150, 0.14);
+  --scrim: rgba(30, 45, 60, 0.12);
+  --figure: rgba(63, 115, 150, 0.2);
+  --ink: #22313d;
+  --ink-2: #45566a;
+  --ink-3: #6d7e8a;
+  --accent: #3f7396;
+  --accent-ink: #2f5f80;
+  --on-accent: #ffffff;
+  --danger: #9a3328;
+  --ok: #2f7a4f;
+}
+
+[data-wallpaper="dusk"] {
+  --wall-paint:
+    radial-gradient(90% 50% at 70% 18%, rgba(255, 236, 214, 0.7), transparent 65%),
+    linear-gradient(180deg, #f1dccb 0%, #e7c2ae 40%, #c99a91 64%, #8e7a8e 100%);
+  --glass-rgb: 255, 248, 242;
+  --sheet: rgba(255, 248, 242, 0.74);
+  --ring: rgba(255, 255, 255, 0.6);
+  --line: rgba(255, 255, 255, 0.5);
+  --mine: rgba(250, 224, 214, 0.62);
+  --track: rgba(60, 30, 30, 0.08);
+  --knob: rgba(255, 255, 255, 0.92);
+  --tag: rgba(154, 75, 87, 0.14);
+  --scrim: rgba(60, 30, 35, 0.12);
+  --figure: rgba(154, 75, 87, 0.2);
+  --ink: #2e2226;
+  --ink-2: #56464a;
+  --ink-3: #7e6a6e;
+  --accent: #9a4b57;
+  --accent-ink: #86404b;
+  --on-accent: #ffffff;
+  --danger: #8f2f25;
+  --ok: #2f6e46;
+}
+
+[data-wallpaper="night"] {
+  --wall-paint:
+    radial-gradient(60% 35% at 20% 12%, rgba(143, 179, 217, 0.25), transparent 70%),
+    radial-gradient(90% 45% at 60% 100%, rgba(80, 110, 160, 0.35), transparent 70%),
+    linear-gradient(180deg, #1b2333 0%, #26324a 45%, #3b4a66 70%, #1a2130 100%);
+  --glass-rgb: 22, 28, 42;
+  --sheet: rgba(28, 35, 52, 0.8);
+  --ring: rgba(255, 255, 255, 0.14);
+  --line: rgba(255, 255, 255, 0.1);
+  --mine: rgba(60, 84, 120, 0.55);
+  --track: rgba(255, 255, 255, 0.08);
+  --knob: rgba(255, 255, 255, 0.18);
+  --tag: rgba(143, 179, 217, 0.18);
+  --scrim: rgba(0, 0, 0, 0.25);
+  --figure: rgba(143, 179, 217, 0.18);
+  --ink: #eef1f6;
+  --ink-2: #c3cad6;
+  --ink-3: #9aa4b4;
+  --accent: #8fb3d9;
+  --accent-ink: #a9c6e6;
+  --on-accent: #10161f;
+  --danger: #f0a49a;
+  --ok: #8fd1a6;
+  color-scheme: dark;
+}
+
+/* 自定义图片：按图片亮度选用浅色或深色墨色，绘制改为用户图片 */
+:root[data-wallpaper-custom="true"] {
+  --wall-paint: var(--wall-image) center / cover no-repeat;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--wall-paint);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

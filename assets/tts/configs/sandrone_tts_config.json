@@ -1,0 +1,21 @@
+{
+  "voice_id": "custom",
+  "engine": "GPT-SoVITS",
+  "version": "v2",
+  "language": "zh",
+  "weights": {
+    "gpt": "weights/gpt.ckpt",
+    "sovits": "weights/sovits.pth"
+  },
+  "reference": {
+    "audio": "reference/reference.wav",
+    "language": "中文"
+  },
+  "inference": {
+    "default_target_language": "中文",
+    "default_ref_language": "中文",
+    "recommended_device": "cpu",
+    "full_precision": true,
+    "output_sample_rate": 32000
+  }
+}
