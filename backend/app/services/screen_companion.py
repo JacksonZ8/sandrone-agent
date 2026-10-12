@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -39,6 +40,8 @@ from .tools.config import get_tool_config
 from .tools.screen import call_vision, vision_settings
 from .tools.windows import MAC_DESKTOP, MacDesktop, WindowImage, hash_distance
 from .usage.audit import sanitize_error
+
+logger = logging.getLogger(__name__)
 
 TICK_SECONDS = 30
 AWAY_SECONDS = 300  # 键鼠空闲超过这么久视为离开，不看
@@ -497,7 +500,7 @@ class ScreenCompanion:
             try:
                 await asyncio.to_thread(self.desktop.notify, "桑多涅", text)
             except Exception:  # noqa: BLE001
-                pass
+                logger.warning("系统通知发送失败", exc_info=True)
         return message
 
     async def _observe_game(
@@ -564,6 +567,7 @@ class ScreenCompanion:
             try:
                 recap = await write_recap(session, game, game_session)
             except Exception as exc:  # noqa: BLE001
+                logger.exception("战报生成失败（%s）", game.name)
                 self.status.message = f"战报生成失败：{sanitize_error(str(exc), limit=160)}"
                 continue
             if recap is None or not recap.text or not game.recap_enabled:
@@ -584,6 +588,7 @@ class ScreenCompanion:
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001
+                logger.exception("看屏陪伴检查出错")
                 self._set("error", message=sanitize_error(str(exc), limit=200))
             await asyncio.sleep(TICK_SECONDS)
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 from typing import Any
 
@@ -14,7 +15,10 @@ from ..llm_service import chat_completion
 from ..provider_service import get_config
 from .common import PERSPECTIVES, _persona_text, _token_similarity, estimate_valence
 from .diary import maybe_write_diary
+from .embedding import LINK_COSINE, embed_texts, memory_vectors
 from .retrieval import retrieve_semantic_memories
+
+logger = logging.getLogger(__name__)
 
 
 def _is_extraction_worthwhile(user_text: str) -> bool:
@@ -208,7 +212,9 @@ def _save_candidates(
     extraction_run: MemoryExtractionRun,
     scope: str = "",
 ) -> int:
-    existing = session.exec(select(SemanticMemory).where(SemanticMemory.status == "active")).all()
+    existing = list(session.exec(select(SemanticMemory).where(SemanticMemory.status == "active")).all())
+    # 有本地向量模型时，意思相近（不只是字面相近）的旧记忆也连联想边；去重仍只看字面，免得把“喜欢/不喜欢”当成重复
+    vectors = memory_vectors(session, existing) if candidates else None
     saved = 0
     for candidate in candidates:
         similarities: list[tuple[float, SemanticMemory]] = []
@@ -222,6 +228,16 @@ def _save_candidates(
                 similarities.append((similarity, old))
         if dup:
             continue
+        fresh = embed_texts([candidate["content"]]) if vectors else None
+        if fresh is not None:
+            vector = fresh[0]
+            lexical_ids = {old.id for _, old in similarities}
+            for old in existing:
+                if old.id in vectors and old.id not in lexical_ids:
+                    cosine = float(vectors[old.id] @ vector)
+                    if cosine >= LINK_COSINE:
+                        similarities.append((cosine, old))
+            similarities.sort(key=lambda item: item[0], reverse=True)
 
         memory = SemanticMemory(
             perspective=candidate.get("perspective", "user"),
@@ -338,6 +354,7 @@ def run_extraction_background(user_message_id: int, assistant_message_id: int) -
                 else:
                     run.status = "fallback"
             except Exception as exc:  # noqa: BLE001
+                logger.exception("记忆提取失败")
                 run.status = "failed"
                 run.error = str(exc)[:2000]
                 session.add(run)
@@ -370,4 +387,4 @@ def run_extraction_background(user_message_id: int, assistant_message_id: int) -
 
             run_game_bookkeeping(session, user_message, assistant_message)
         except Exception:  # noqa: BLE001 - 记账失败不影响记忆提取
-            pass
+            logger.exception("游戏记账失败")

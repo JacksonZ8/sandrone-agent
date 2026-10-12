@@ -5,6 +5,7 @@ import base64
 import hashlib
 import io
 import json
+import logging
 import os
 import secrets
 import struct
@@ -21,6 +22,8 @@ from ..database import engine
 from ..models import Message, WeChatAccount, utcnow
 from .chat_service import create_chat_turn
 from .memory_service import run_extraction_background
+
+logger = logging.getLogger(__name__)
 
 # 协议常量：与 Hermes weixin.py 保持一致
 ILINK_BASE_URL = os.getenv("SANDRONE_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com")
@@ -392,6 +395,7 @@ class WeChatRuntime:
                 break
             except Exception as exc:
                 consecutive_failures += 1
+                logger.warning("微信拉取消息失败（连续 %s 次）：%s", consecutive_failures, exc)
                 with Session(engine) as session:
                     account = get_wechat_account(session)
                     account.status = "connected" if consecutive_failures < 3 else "error"
@@ -445,7 +449,7 @@ class WeChatRuntime:
         try:
             await self._process_message(message)
         except Exception:
-            pass
+            logger.exception("微信消息处理失败")
 
     async def _process_message(self, message: dict[str, Any]) -> None:
         sender_id = str(message.get("from_user_id") or "").strip()

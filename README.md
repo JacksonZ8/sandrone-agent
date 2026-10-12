@@ -9,7 +9,7 @@ A local-first companion agent with a single continuous timeline, human-like long
 ## 功能
 
 - **单一时间线**：没有“多会话”；网页、微信私聊与语音通话写进同一条时间线，换渠道也能接着聊。可删除消息、重新生成最新回复。
-- **类人长期记忆**：关于你 / 关于她自己 / 我们之间三个视角，对话后异步提取；遗忘曲线、情绪显著度、记忆联想（1–2 跳）、日记反思与记忆整理；每条回复可展开查看她实际唤起了哪些记忆。
+- **类人长期记忆**：关于你 / 关于她自己 / 我们之间三个视角，对话后异步提取；检索按字面与意思（可选本地中文向量模型）匹配；遗忘曲线、情绪显著度、记忆联想（1–2 跳）、日记反思与记忆整理；每条回复可展开查看她实际唤起了哪些记忆。数据库每天自动备份，后端日志写进 `data/logs/`。
 - **关系与人设**：好感度、熟悉度、信任度随对话变化，人设随阶段软化；她有连续的情绪、精力与专注状态。
 - **实时语音通话**：本地 sherpa-onnx 流式识别 + Silero VAD + Smart Turn v3 语义断句，LLM 流式回复逐句交给本地 GPT-SoVITS 流式合成；可随时打断。音色需自备（见 [`assets/tts/README.md`](assets/tts/README.md)）。
 - **形象**：可选 Cubism Live2D 模型或逐帧形象包，口型跟随实时音量、表情跟随情绪标签；没有素材时显示剪影（见 [`docs/live2d.md`](docs/live2d.md)、[`docs/character.md`](docs/character.md)）。
@@ -60,6 +60,12 @@ python3 -m venv .venv
 
 ```bash
 scripts/fetch_voice_models.sh
+```
+
+记忆检索可选用本地中文向量模型（bge-small-zh-v1.5，约 95MB，带 SHA-256 校验），按意思而不只按字面想起相关记忆；不下载时只用分词匹配：
+
+```bash
+scripts/fetch_memory_model.sh
 ```
 
 ### 2. 前端开发模式
@@ -134,7 +140,7 @@ API Key 只保存在本机 SQLite 中，接口只回传掩码和后 4 位。
   ├─ LLM 从 user / self / shared 三个视角提取候选记忆
   ├─ 规则提取兜底
   ├─ 去重入库，来源可追溯
-  ├─ 相关记忆自动建立联想边（memory_links）
+  ├─ 字面或意思相近的记忆自动建立联想边（memory_links）
   ├─ 每 10 轮或间隔超过 20 小时，她写一篇只属于自己的日记
   └─ 遗忘曲线按重要度衰减；低强度且长期未唤起的记忆进入休眠
 ```

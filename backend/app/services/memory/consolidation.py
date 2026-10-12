@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import math
 import re
 from typing import Any
@@ -13,6 +14,9 @@ from ...models import MemoryConsolidationRun, MemoryLink, SemanticMemory, utcnow
 from ..llm_service import chat_completion
 from ..provider_service import get_agent_state, get_config
 from .common import _age_days, _age_hours, _token_similarity
+from .embedding import similar_memory_pairs
+
+logger = logging.getLogger(__name__)
 
 
 def apply_forgetting(session: Session) -> int:
@@ -139,6 +143,7 @@ def _apply_consolidation_actions(session: Session, actions: list[dict[str, Any]]
                         )
                         summary.append(f"建立联想 #{source_id} -> #{target_id}（{relation}）")
         except Exception:
+            logger.warning("跳过一条无法执行的记忆整理动作：%s", action, exc_info=True)
             continue
     session.commit()
     return summary
@@ -168,6 +173,21 @@ def _rule_based_links(session: Session) -> list[dict[str, Any]]:
                         }
                     )
     return actions[:20]
+
+
+def _semantic_links(session: Session, planned: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """按意思相近补联想边（有本地向量模型时）：每次整理最多 20 条，旧记忆会逐日连上。"""
+    memories = list(session.exec(select(SemanticMemory).where(SemanticMemory.status == "active")).all())
+    linked = {frozenset((link.source_id, link.target_id)) for link in session.exec(select(MemoryLink)).all()}
+    linked |= {
+        frozenset((int(action.get("source_id", 0)), int(action.get("target_id", 0))))
+        for action in planned
+        if action.get("action") == "link"
+    }
+    return [
+        {"action": "link", "source_id": a, "target_id": b, "relation": "similar", "weight": round(cosine, 4)}
+        for cosine, a, b in similar_memory_pairs(session, memories, exclude=linked)
+    ]
 
 
 def _consolidate_with_session(session: Session, trigger: str) -> MemoryConsolidationRun:
@@ -228,6 +248,7 @@ def _consolidate_with_session(session: Session, trigger: str) -> MemoryConsolida
             actions = _parse_consolidation_actions(result["text"])
             run.status = "success" if actions else "skipped"
         except Exception as exc:  # noqa: BLE001
+            logger.exception("记忆整理失败")
             run.status = "failed"
             run.error = str(exc)[:2000]
             session.add(run)
@@ -235,6 +256,9 @@ def _consolidate_with_session(session: Session, trigger: str) -> MemoryConsolida
             session.refresh(run)
             return run
 
+    actions = actions + _semantic_links(session, actions)
+    if actions and run.status == "skipped":
+        run.status = "success"
     summary = _apply_consolidation_actions(session, actions)
     run.actions_json = json.dumps(actions, ensure_ascii=False)
     if summary:

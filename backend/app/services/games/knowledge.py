@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 import shutil
 import threading
@@ -31,6 +32,8 @@ from ..tools.search import search_web_with_audit
 from ..tools.web import is_public_url, web_fetch
 from .profiles import merge_save_card
 from .scope import aliases
+
+logger = logging.getLogger(__name__)
 
 KNOWLEDGE_MAX_CHARS = 9000
 SOURCE_MAX_CHARS = 12000
@@ -277,7 +280,7 @@ def note_knowledge(game: GameProfile, text: str, url: str = "", kind: str = "cha
                 try:
                     asyncio.run(consolidate_pending(session, current))
                 except Exception:  # noqa: BLE001 - 留着 pending，下次整理时一并处理
-                    pass
+                    logger.exception("游戏知识后台整理失败（game_id=%s）", game_id)
 
     threading.Thread(target=worker, daemon=True).start()
     return source
@@ -325,7 +328,8 @@ async def _search(session: Session, queries: list[str], tool_config: ToolConfig)
     for query in queries:
         try:
             found = await asyncio.to_thread(search_web_with_audit, session, query, tool_config, limit=6)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("游戏资料搜索失败：%s（%s）", query, exc)
             continue
         seen = {item.get("url") for item in results}
         results.extend(item for item in found if item.get("url") not in seen)

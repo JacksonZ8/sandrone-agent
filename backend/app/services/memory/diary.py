@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 from typing import Any
 
@@ -13,6 +14,8 @@ from ..llm_service import chat_completion
 from ..provider_service import get_agent_state, get_config
 from .common import _age_hours, _persona_text
 from .consolidation import maybe_apply_forgetting, maybe_consolidate_memories
+
+logger = logging.getLogger(__name__)
 
 
 def _recent_transcript(session: Session, limit: int = 14) -> str:
@@ -136,7 +139,8 @@ def _write_diary_with_llm(session: Session, turn_index: int) -> AgentDiary | Non
                 temperature=0.6,
             )
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
+        logger.exception("写日记失败")
         return None
 
     data = _parse_diary_result(result["text"])

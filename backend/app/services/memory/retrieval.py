@@ -10,10 +10,12 @@ from ...models import AgentDiary, MemoryLink, Message, SemanticMemory, utcnow
 from ..games.scope import active_game_scopes
 from ..provider_service import get_agent_state
 from .common import _age_days, _dt, tokenize
+from .embedding import semantic_relevance, semantic_scores
 
 GAME_SCOPE_BOOST = 0.12
 GAME_SCOPE_PENALTY = 0.4
 GAME_OUT_OF_SCOPE_MIN_MATCH = 0.2
+RELEVANCE_WEIGHT = 0.65  # 相关度占比；原为 0.44，在召回评测上 hit@3 0.23→0.37（纯分词）
 
 
 def retrieve_semantic_memories_scored(
@@ -36,6 +38,8 @@ def retrieve_semantic_memories_scored(
         statement.order_by(SemanticMemory.updated_at.desc())
     ).all()
 
+    # 按意思的相似度（有本地向量模型时）；和字面匹配取较大者，字面命中的老行为不变
+    cosines = semantic_scores(session, query, list(memories)) or {}
     scored: list[tuple[float, SemanticMemory]] = []
     query_norm = (query or "").lower()
     for memory in memories:
@@ -48,25 +52,27 @@ def retrieve_semantic_memories_scored(
         elif (memory.content or "").lower() in query_norm and len(memory.content) >= 4:
             substring_boost = 0.25
 
+        semantic = semantic_relevance(cosines.get(memory.id)) if memory.id is not None else 0.0
+        relevance = max(min(jaccard + substring_boost, 1.0), semantic)
         recency = math.exp(-_age_days(memory.created_at) / 21.0)
         access = min(math.log1p(memory.access_count) / 6.0, 1.0)
         emotion_salience = min(abs(memory.valence), 1.0)
-        score = (
-            0.44 * min(jaccard + substring_boost, 1.0)
-            + 0.22 * memory.importance
+        prior = (
+            0.22 * memory.importance
             + 0.12 * recency
             + 0.08 * access
             + 0.08 * min(memory.strength, 1.0)
             + 0.06 * emotion_salience
-        )
+        ) / 0.56
+        score = RELEVANCE_WEIGHT * relevance + (1 - RELEVANCE_WEIGHT) * prior
         if memory.scope:
             if memory.scope in scopes:
                 score += GAME_SCOPE_BOOST
-            elif jaccard + substring_boost < GAME_OUT_OF_SCOPE_MIN_MATCH:
+            elif relevance < GAME_OUT_OF_SCOPE_MIN_MATCH:
                 continue  # 不在这个游戏的语境、内容也不相关：不唤起
             else:
                 score *= GAME_SCOPE_PENALTY
-        if overlap == 0 and not substring_boost and score < 0.25:
+        if overlap == 0 and not substring_boost and not semantic and score < 0.25:
             continue
         scored.append((score, memory))
 

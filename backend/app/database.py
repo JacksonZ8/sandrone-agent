@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import shutil
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+from sqlalchemy import event
 from sqlmodel import Session, SQLModel, create_engine
 
 from .config import DATA_DIR, DATABASE_URL
@@ -12,24 +13,60 @@ connect_args = (
     {"check_same_thread": False, "timeout": 30} if DATABASE_URL.startswith("sqlite") else {}
 )
 engine = create_engine(DATABASE_URL, echo=False, connect_args=connect_args)
+BACKUP_DIR = DATA_DIR / "backups"
+
+
+def sqlite_file() -> Path | None:
+    """当前数据库文件路径；不是 SQLite 文件库（如内存库）时返回 None。"""
+    if not DATABASE_URL.startswith("sqlite"):
+        return None
+    name = engine.url.database
+    if not name or name == ":memory:":
+        return None
+    return Path(name)
+
+
+@event.listens_for(engine, "connect")
+def _sqlite_pragmas(dbapi_connection, _record) -> None:
+    # WAL：读写互不阻塞，后台的记忆提取、看屏、主动消息与通话同时写库时不再互相等锁
+    if sqlite_file() is None:
+        return
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.close()
+
+
+def backup_database(target: Path, source: Path | None = None) -> Path | None:
+    """用 SQLite 在线备份接口复制数据库。WAL 模式下直接拷文件会漏掉 -wal 里还没写回的内容。"""
+    source = source or sqlite_file()
+    if source is None or not source.exists() or source.stat().st_size == 0:
+        return None
+    target.parent.mkdir(parents=True, exist_ok=True)
+    partial = target.with_name(target.name + ".partial")
+    src = sqlite3.connect(source, timeout=30)
+    try:
+        dst = sqlite3.connect(partial)
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+    finally:
+        src.close()
+    partial.replace(target)
+    return target
+
+
+def prune_backups(directory: Path, keep: int) -> None:
+    for old in sorted(directory.glob("sandrone_agent_*.db"))[:-keep]:
+        old.unlink(missing_ok=True)
 
 
 def _backup_sqlite_database() -> None:
-    """迁移前备份旧数据库，避免结构升级时丢失用户数据。"""
-    if not DATABASE_URL.startswith("sqlite"):
-        return
-    db_path = Path(engine.url.database)
-    if not db_path.exists() or db_path.stat().st_size == 0:
-        return
-    backup_dir = DATA_DIR / "backups"
-    backup_dir.mkdir(parents=True, exist_ok=True)
+    """迁移前备份旧数据库，避免结构升级时丢失用户数据；只保留最近 20 份。"""
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    target = backup_dir / f"sandrone_agent_{stamp}.db"
-    shutil.copy2(db_path, target)
-    # 只保留最近 20 份备份
-    backups = sorted(backup_dir.glob("sandrone_agent_*.db"))
-    for old in backups[:-20]:
-        old.unlink(missing_ok=True)
+    if backup_database(BACKUP_DIR / f"sandrone_agent_{stamp}.db"):
+        prune_backups(BACKUP_DIR, 20)
 
 
 def _migrate_schema() -> None:

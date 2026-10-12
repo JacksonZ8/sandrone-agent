@@ -36,6 +36,11 @@ GPT_SOVITS_MPLCONFIGDIR = Path(
 TTS_API_BASE_URL = os.getenv("SANDRONE_TTS_API_BASE_URL", "http://127.0.0.1:9881")
 TTS_API_CONFIG_PATH = DATA_DIR / "tts_infer_sandrone.yaml"
 
+# 记忆检索用的中文向量模型（由 scripts/fetch_memory_model.sh 下载，不进 Git；缺失时只用分词匹配）
+EMBEDDING_MODEL_DIR = Path(
+    os.getenv("SANDRONE_EMBEDDING_MODEL_DIR", str(DATA_DIR / "models" / "bge-small-zh-v1.5"))
+)
+
 # 实时语音：sherpa-onnx 流式识别与 VAD 模型（由 scripts/fetch_voice_models.sh 下载，不进 Git）
 VOICE_MODEL_DIR = Path(os.getenv("SANDRONE_VOICE_MODEL_DIR", str(DATA_DIR / "voice_models")))
 ASR_MODEL_NAME = os.getenv(

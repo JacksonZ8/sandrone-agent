@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -19,6 +20,8 @@ from .account import MILESTONE_EVENTS, add_milestone, list_milestones
 from .knowledge import consolidate, knowledge_excerpt, save_source
 from .profiles import ROLES, SAVE_FIELDS, load_save_card, merge_save_card, save_card_text
 from .scope import SESSION_IDLE_MINUTES, active_session, as_utc, game_scope, mentioned_games
+
+logger = logging.getLogger(__name__)
 
 SCENES = {"combat", "result", "death", "menu", "loading", "map", "dialog", "other"}
 EVENTS = {"victory", "boss_defeated", "death", "level_up", "unlock", "none"}
@@ -310,7 +313,7 @@ async def write_recap(session: Session, game: GameProfile, game_session: GameSes
         try:
             await consolidate(session, game, [source])
         except Exception:  # noqa: BLE001 - 整理失败时资料仍在，下次整理时一并处理
-            pass
+            logger.exception("游戏知识整理失败（%s）", game.name)
     return recap
 
 

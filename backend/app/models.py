@@ -76,6 +76,17 @@ class SemanticMemory(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utcnow)
 
 
+class MemoryEmbedding(SQLModel, table=True):
+    """记忆内容的向量缓存：本地向量模型算出，内容或模型变了就重算。"""
+
+    __tablename__ = "memory_embeddings"
+
+    memory_id: int = Field(primary_key=True)
+    model: str
+    content_hash: str
+    vector: bytes
+
+
 class MemoryLink(SQLModel, table=True):
     """记忆之间的联想边，为 M3 的图检索预留。"""
 

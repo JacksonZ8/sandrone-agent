@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import random
 import re
 from dataclasses import dataclass
@@ -19,6 +20,8 @@ from .provider_service import get_agent_state, get_config
 from .style_guard import recent_repetition_block
 from . import push_service
 from .usage.audit import sanitize_error
+
+logger = logging.getLogger(__name__)
 
 TICK_SECONDS = 300
 MIN_SLOT_GAP_MINUTES = 90
@@ -228,7 +231,7 @@ async def send_to_owner(
         try:
             await push_service.notify(session, title="桑多涅", body=text)
         except Exception:  # noqa: BLE001
-            pass
+            logger.exception("主动消息的手机推送失败")
 
     config = get_config(session)
     state = get_agent_state(session)
@@ -341,7 +344,7 @@ class ProactiveScheduler:
             except asyncio.CancelledError:
                 raise
             except Exception:  # noqa: BLE001
-                pass
+                logger.exception("主动消息调度出错")
             await asyncio.sleep(TICK_SECONDS)
 
     def start(self) -> None:

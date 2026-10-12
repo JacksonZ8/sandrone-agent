@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import mimetypes
 import threading
 from contextlib import asynccontextmanager
@@ -12,9 +13,12 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import APP_NAME, APP_VERSION, AUDIO_CACHE_DIR, CHARACTER_DIR, FRONTEND_DIST, LIVE2D_DIR
 from .database import init_db
+from .logging_setup import log_asyncio_exceptions, setup_logging
 from .routers import chat, companion, games, live2d, memories, proactive, providers, push, state, tools, tts, usage, voice, wechat
 from .security import LocalRequestGuard
+from .services.backup_service import DAILY_BACKUP
 from .services.memory.common import warm_up as warm_up_tokenizer
+from .services.memory.embedding import warm_up as warm_up_embedding
 from .services.proactive_service import PROACTIVE_SCHEDULER
 from .services.screen_companion import COMPANION
 from .services.tts_service import start_tts_api_background, stop_tts_api
@@ -28,14 +32,19 @@ NO_CACHE_FILES = {"sw.js", "manifest.webmanifest"}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    setup_logging()
+    log_asyncio_exceptions(asyncio.get_running_loop())
     init_db()
     await startup_wechat()
     start_tts_api_background()
     start_asr_background()
     threading.Thread(target=warm_up_tokenizer, daemon=True).start()
+    threading.Thread(target=warm_up_embedding, daemon=True).start()
     PROACTIVE_SCHEDULER.start()
     COMPANION.start()
+    DAILY_BACKUP.start()
     yield
+    await DAILY_BACKUP.stop()
     await COMPANION.stop()
     await PROACTIVE_SCHEDULER.stop()
     await shutdown_wechat()
