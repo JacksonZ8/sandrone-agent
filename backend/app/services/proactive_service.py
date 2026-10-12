@@ -14,7 +14,8 @@ from sqlmodel import Session, select
 
 from ..database import engine
 from ..models import Message, ProactiveConfig, ProactiveEvent, utcnow
-from .chat_service import CHANNEL_HINTS, build_system_prompt, get_recent_messages, next_turn_index
+from .chat_prompt import CHANNEL_HINTS, build_system_prompt
+from .chat_service import get_recent_messages, next_turn_index
 from .llm_service import chat_completion
 from .provider_service import get_agent_state, get_config
 from .style_guard import recent_repetition_block

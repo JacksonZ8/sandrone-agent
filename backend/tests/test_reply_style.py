@@ -11,7 +11,7 @@ from sqlmodel import Session, SQLModel, create_engine
 from app.schemas import ChatRequest
 from tests.llm_fakes import FakeStream, reply
 from app.services import chat_service
-from app.services.chat_service import reply_style_block
+from app.services.chat_prompt import reply_style_block
 
 
 class ReplyStyleBlockTests(unittest.TestCase):

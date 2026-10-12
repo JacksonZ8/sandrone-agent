@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sqlite3
 from datetime import datetime
 from pathlib import Path
@@ -162,6 +163,19 @@ def _migrate_schema() -> None:
         )
 
 
+def _encrypt_plaintext_secrets() -> None:
+    """旧版本把 API Key 明文存在库里：改写成密文（改写前先备份，备份里仍是旧明文）。"""
+    from .secret_store import encrypt_existing_secrets, plaintext_secret_count
+
+    with engine.connect() as connection:
+        if not plaintext_secret_count(connection):
+            return
+    _backup_sqlite_database()
+    with engine.begin() as connection:
+        changed = encrypt_existing_secrets(connection)
+    logging.getLogger(__name__).info("已把 %s 项明文密钥改为加密存放", changed)
+
+
 def init_db() -> None:
     from . import models  # noqa: F401
     from .services.provider_service import (
@@ -173,6 +187,7 @@ def init_db() -> None:
     SQLModel.metadata.create_all(engine)
     if DATABASE_URL.startswith("sqlite"):
         _migrate_schema()
+        _encrypt_plaintext_secrets()
 
     with Session(engine) as session:
         seed_default_config(session)

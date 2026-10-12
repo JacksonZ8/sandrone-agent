@@ -196,7 +196,8 @@ def may_speak(game: GameProfile, game_session: GameSession, state: GameState, no
 
 
 async def compose_game_remark(session: Session, game: GameProfile) -> str:
-    from ..chat_service import build_system_prompt, get_recent_messages
+    from ..chat_prompt import build_system_prompt
+    from ..chat_service import get_recent_messages
 
     role = ROLES.get(game.role, ROLES["spectator"])
     config = get_config(session)

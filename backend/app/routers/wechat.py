@@ -13,14 +13,8 @@ from ..schemas import (
     WeChatSendResponse,
     WeChatStatus,
 )
-from ..services.wechat_service import (
-    apply_wechat_config,
-    get_runtime,
-    poll_wechat_login,
-    start_owner_pairing,
-    start_wechat_login,
-    wechat_status,
-)
+from ..services.wechat_login import poll_wechat_login, start_wechat_login
+from ..services.wechat_service import apply_wechat_config, get_runtime, start_owner_pairing, wechat_status
 
 router = APIRouter(prefix="/api/wechat", tags=["wechat"])
 

@@ -9,12 +9,8 @@ from sqlmodel import Session, select
 from ..database import get_session
 from ..models import Message
 from ..schemas import ChatRequest, ChatResponse, MessagePublic, ReplyStyleRequest
-from ..services.chat_service import (
-    create_chat_turn,
-    create_chat_turn_stream,
-    message_public,
-    reply_style_block,
-)
+from ..services.chat_prompt import reply_style_block
+from ..services.chat_service import create_chat_turn, create_chat_turn_stream, message_public
 from ..services.memory_service import run_extraction_background
 from ..services.message_service import MessageActionError, delete_message, prepare_regenerate
 

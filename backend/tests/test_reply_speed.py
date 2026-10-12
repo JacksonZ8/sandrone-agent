@@ -9,7 +9,8 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from app.models import LLMConfig, Message
 from app.services import chat_service, llm_service
-from app.services.chat_service import get_recent_messages, layout_messages
+from app.services.chat_prompt import layout_messages
+from app.services.chat_service import get_recent_messages
 from tests.llm_fakes import FakeStream, reply
 
 

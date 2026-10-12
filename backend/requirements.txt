@@ -4,6 +4,8 @@ sqlmodel>=0.0.22
 httpx>=0.27.0
 jieba>=0.42.1
 python-dotenv>=1.0.0
+# 数据库里的 API Key 加密存放（主密钥在 macOS 钥匙串）；原本已随 pywebpush 安装
+cryptography>=42
 qrcode[pil]>=7.4
 # 实时语音通话：流式语音识别与 VAD（模型由 scripts/fetch_voice_models.sh 下载）
 sherpa-onnx==1.13.8

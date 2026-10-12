@@ -9,14 +9,8 @@ from typing import Any
 from sqlmodel import Session
 
 from ...models import Message
-from ..chat_service import (
-    CHANNEL_HINTS,
-    _finish_assistant_message,
-    build_prompt_parts,
-    get_recent_messages,
-    layout_messages,
-    next_turn_index,
-)
+from ..chat_prompt import CHANNEL_HINTS, build_prompt_parts, layout_messages
+from ..chat_service import _finish_assistant_message, get_recent_messages, next_turn_index
 from ..llm_service import chat_completion_stream, resolve_thinking
 from ..memory_service import estimate_importance, estimate_valence
 from ..provider_service import get_config

@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 
 from sqlmodel import Field, SQLModel
 
+from .secret_store import EncryptedStr
+
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
@@ -16,7 +18,7 @@ class LLMConfig(SQLModel, table=True):
     provider: str = Field(default="deepseek", index=True)
     base_url: str = Field(default="https://api.deepseek.com")
     model: str = Field(default="deepseek-v4-flash")
-    api_key: str = Field(default="")
+    api_key: str = Field(default="", sa_type=EncryptedStr)
     temperature: float = Field(default=0.75)
     max_tokens: int = Field(default=1024)
     timeout_seconds: float = Field(default=60.0)
@@ -213,7 +215,7 @@ class WeChatAccount(SQLModel, table=True):
     enabled: bool = Field(default=False)
     name: str = Field(default="微信")
     account_id: str = Field(default="")
-    token: str = Field(default="")
+    token: str = Field(default="", sa_type=EncryptedStr)
     base_url: str = Field(default="https://ilinkai.weixin.qq.com")
     cdn_base_url: str = Field(default="https://novac2c.cdn.weixin.qq.com/c2c")
     user_id: str = Field(default="")
@@ -236,11 +238,11 @@ class ToolConfig(SQLModel, table=True):
     files_enabled: bool = Field(default=False)
     file_allowlist: str = Field(default="[]")  # JSON list[str]，允许读取的目录
     search_provider: str = Field(default="duckduckgo")  # duckduckgo / brave / tavily / serper
-    search_api_key: str = Field(default="")
+    search_api_key: str = Field(default="", sa_type=EncryptedStr)
     screen_enabled: bool = Field(default=False)
     vision_base_url: str = Field(default="")
     vision_model: str = Field(default="")
-    vision_api_key: str = Field(default="")
+    vision_api_key: str = Field(default="", sa_type=EncryptedStr)
     agent_enabled: bool = Field(default=False)
     agent_command: str = Field(default="claude")
     agent_permission: str = Field(default="readonly")  # readonly / write

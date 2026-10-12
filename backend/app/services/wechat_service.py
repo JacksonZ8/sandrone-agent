@@ -1,14 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-import base64
 import hashlib
-import io
 import json
 import logging
-import os
 import secrets
-import struct
 import time
 import uuid
 from collections import deque
@@ -22,26 +18,20 @@ from ..database import engine
 from ..models import Message, WeChatAccount, utcnow
 from .chat_service import create_chat_turn
 from .memory_service import run_extraction_background
+from .wechat_ilink import (
+    EP_GET_UPDATES,
+    EP_SEND_MESSAGE,
+    ITEM_TEXT,
+    LONG_POLL_TIMEOUT_MS,
+    MSG_STATE_FINISH,
+    MSG_TYPE_BOT,
+    RATE_LIMIT_ERRCODE,
+    SESSION_EXPIRED_ERRCODE,
+    _api_post_json,
+    _extract_text,
+)
 
 logger = logging.getLogger(__name__)
-
-# 协议常量：与 Hermes weixin.py 保持一致
-ILINK_BASE_URL = os.getenv("SANDRONE_WECHAT_BASE_URL", "https://ilinkai.weixin.qq.com")
-ILINK_APP_ID = "bot"
-ILINK_APP_CLIENT_VERSION = (2 << 16) | (2 << 8) | 0
-EP_GET_UPDATES = "ilink/bot/getupdates"
-EP_SEND_MESSAGE = "ilink/bot/sendmessage"
-EP_GET_BOT_QR = "ilink/bot/get_bot_qrcode"
-EP_GET_QR_STATUS = "ilink/bot/get_qrcode_status"
-
-ITEM_TEXT = 1
-MSG_TYPE_BOT = 2
-MSG_STATE_FINISH = 2
-LONG_POLL_TIMEOUT_MS = 35_000
-API_TIMEOUT_MS = 15_000
-QR_TIMEOUT_MS = 35_000
-SESSION_EXPIRED_ERRCODE = -14
-RATE_LIMIT_ERRCODE = -2
 
 PAIRING_CODE_TTL_SECONDS = 600
 PAIRING_MAX_FAILURES = 10
@@ -49,42 +39,8 @@ UNPAIRED_REPLY = "这个账号还没有完成绑定。请先在桑多涅的设�
 PAIRED_REPLY = "绑定完成。之后这个账号只和你对话。"
 WECHAT_FAILURE_REPLY = "……我这边的核心暂时连不上，没法好好回你。原因记在网页「用量」页的最近错误里，修好再来找我。"
 
-_QR_STATES: dict[str, dict[str, Any]] = {}
 _PAIRING: dict[str, Any] = {}
 _runtime: "WeChatRuntime | None" = None
-
-
-def _json_dumps(payload: dict[str, Any]) -> str:
-    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-
-
-def _base_info() -> dict[str, Any]:
-    return {"channel_version": "2.2.0"}
-
-
-def _random_wechat_uin() -> str:
-    value = struct.unpack(">I", secrets.token_bytes(4))[0]
-    return base64.b64encode(str(value).encode("utf-8")).decode("ascii")
-
-
-def _headers(token: str, body: str) -> dict[str, str]:
-    headers = {
-        "Content-Type": "application/json",
-        "AuthorizationType": "ilink_bot_token",
-        "X-WECHAT-UIN": _random_wechat_uin(),
-        "iLink-App-Id": ILINK_APP_ID,
-        "iLink-App-ClientVersion": str(ILINK_APP_CLIENT_VERSION),
-    }
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    return headers
-
-
-def _api_headers() -> dict[str, str]:
-    return {
-        "iLink-App-Id": ILINK_APP_ID,
-        "iLink-App-ClientVersion": str(ILINK_APP_CLIENT_VERSION),
-    }
 
 
 def seed_wechat_account(session: Session) -> WeChatAccount:
@@ -180,135 +136,6 @@ def _match_pairing_code(text: str) -> bool:
     if _PAIRING["failures"] >= PAIRING_MAX_FAILURES:
         _PAIRING.clear()
     return False
-
-
-def _extract_text(item_list: list[dict[str, Any]]) -> str:
-    for item in item_list or []:
-        if item.get("type") == ITEM_TEXT:
-            return str((item.get("text_item") or {}).get("text") or "").strip()
-    return ""
-
-
-async def _api_get_json(url: str) -> dict[str, Any]:
-    async with httpx.AsyncClient(timeout=QR_TIMEOUT_MS / 1000, headers=_api_headers()) as client:
-        response = await client.get(url)
-        response.raise_for_status()
-        return response.json()
-
-
-async def _api_post_json(
-    *,
-    base_url: str,
-    endpoint: str,
-    payload: dict[str, Any],
-    token: str,
-    timeout_ms: int = API_TIMEOUT_MS,
-) -> dict[str, Any]:
-    body = _json_dumps({**payload, "base_info": _base_info()})
-    url = f"{base_url.rstrip('/')}/{endpoint}"
-    async with httpx.AsyncClient(timeout=timeout_ms / 1000, headers=_headers(token, body)) as client:
-        response = await client.post(url, content=body)
-        response.raise_for_status()
-        return response.json()
-
-
-async def start_wechat_login() -> dict[str, Any]:
-    base_url = ILINK_BASE_URL
-    try:
-        response = await _api_get_json(f"{base_url}/{EP_GET_BOT_QR}?bot_type=3")
-    except Exception as exc:
-        return {
-            "ok": False,
-            "qrcode": "",
-            "qr_url": "",
-            "qr_data_url": "",
-            "message": f"获取二维码失败：{exc}",
-        }
-
-    qrcode_value = str(response.get("qrcode") or "")
-    qr_url = str(response.get("qrcode_img_content") or qrcode_value)
-    if not qrcode_value:
-        return {"ok": False, "qrcode": "", "qr_url": "", "qr_data_url": "", "message": "二维码响应为空。"}
-
-    qr_data_url = ""
-    try:
-        import qrcode as qrcode_lib
-
-        image = qrcode_lib.make(qr_url or qrcode_value)
-        buf = io.BytesIO()
-        image.save(buf, format="PNG")
-        qr_data_url = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
-    except Exception:
-        qr_data_url = ""
-
-    _QR_STATES[qrcode_value] = {
-        "base_url": base_url,
-        "created_at": time.time(),
-        "refresh_count": 0,
-    }
-    return {
-        "ok": True,
-        "qrcode": qrcode_value,
-        "qr_url": qr_url,
-        "qr_data_url": qr_data_url,
-        "message": "请使用微信扫码，并在手机端确认。",
-    }
-
-
-async def poll_wechat_login(qrcode: str) -> dict[str, Any]:
-    state = _QR_STATES.get(qrcode)
-    if state is None:
-        return {"status": "expired", "message": "二维码状态不存在，请重新发起登录。", "account_id": "", "base_url": ""}
-
-    base_url = str(state.get("base_url") or ILINK_BASE_URL)
-    try:
-        response = await _api_get_json(f"{base_url}/{EP_GET_QR_STATUS}?qrcode={qrcode}")
-    except Exception as exc:
-        return {"status": "wait", "message": f"查询失败，继续等待：{exc}", "account_id": "", "base_url": ""}
-
-    status = str(response.get("status") or "wait")
-    if status == "wait":
-        return {"status": "wait", "message": "等待扫码。", "account_id": "", "base_url": ""}
-    if status == "scaned":
-        return {"status": "scaned", "message": "已扫码，请在微信中确认。", "account_id": "", "base_url": ""}
-    if status == "scaned_but_redirect":
-        redirect_host = str(response.get("redirect_host") or "")
-        if redirect_host:
-            state["base_url"] = f"https://{redirect_host}"
-        return {"status": "scaned", "message": "已扫码，正在跳转。", "account_id": "", "base_url": ""}
-    if status == "expired":
-        return {"status": "expired", "message": "二维码已过期，请重新发起登录。", "account_id": "", "base_url": ""}
-    if status == "confirmed":
-        account_id = str(response.get("ilink_bot_id") or "")
-        token = str(response.get("bot_token") or "")
-        confirmed_base_url = str(response.get("baseurl") or base_url)
-        user_id = str(response.get("ilink_user_id") or "")
-        if not account_id or not token:
-            return {"status": "error", "message": "登录确认成功，但凭据不完整。", "account_id": "", "base_url": ""}
-
-        with Session(engine) as session:
-            account = get_wechat_account(session)
-            account.enabled = True
-            account.account_id = account_id
-            account.token = token
-            account.base_url = confirmed_base_url
-            account.user_id = user_id
-            account.status = "connecting"
-            account.last_error = ""
-            account.updated_at = utcnow()
-            session.add(account)
-            session.commit()
-        _QR_STATES.pop(qrcode, None)
-        if _runtime is not None:
-            await _runtime.restart()
-        return {
-            "status": "confirmed",
-            "message": "微信登录成功，正在连接。",
-            "account_id": account_id,
-            "base_url": confirmed_base_url,
-        }
-
-    return {"status": status, "message": f"未知状态：{status}", "account_id": "", "base_url": ""}
 
 
 class WeChatRuntime:

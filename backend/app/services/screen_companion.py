@@ -289,7 +289,8 @@ async def describe_window(session: Session, app: str, image: WindowImage) -> See
 
 
 async def compose_remark(session: Session) -> str:
-    from .chat_service import build_system_prompt, get_recent_messages
+    from .chat_prompt import build_system_prompt
+    from .chat_service import get_recent_messages
 
     config = get_config(session)
     recent = get_recent_messages(session, thread_id="main")

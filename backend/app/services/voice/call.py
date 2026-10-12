@@ -15,7 +15,7 @@ from fastapi import WebSocket
 from sqlmodel import Session
 
 from ...database import engine
-from ..chat_service import reply_style_block
+from ..chat_prompt import reply_style_block
 from ..llm_service import LLMError
 from ..memory_service import run_extraction_background
 from ..tts_service import save_wav, stream_tts_pcm
