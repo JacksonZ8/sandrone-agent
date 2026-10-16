@@ -6,10 +6,10 @@ from typing import Any
 from sqlmodel import Session, select
 
 from ...config import EPISODIC_RECALL_LIMIT, SEMANTIC_MEMORY_LIMIT
-from ...models import AgentDiary, MemoryLink, Message, SemanticMemory, utcnow
+from ...models import AgentDiary, MemoryLink, MemoryRedaction, Message, SemanticMemory
 from ..games.scope import active_game_scopes
 from ..provider_service import get_agent_state
-from .common import _age_days, _dt, tokenize
+from .common import _age_days, _dt, effective_strength, tokenize
 from .embedding import semantic_relevance, semantic_scores
 
 GAME_SCOPE_BOOST = 0.12
@@ -18,12 +18,27 @@ GAME_OUT_OF_SCOPE_MIN_MATCH = 0.2
 RELEVANCE_WEIGHT = 0.65  # 相关度占比；原为 0.44，在召回评测上 hit@3 0.23→0.37（纯分词）
 
 
+def memory_relevance(
+    query_tokens: frozenset[str], query_norm: str, memory: SemanticMemory, cosine: float | None
+) -> tuple[float, int, float, float]:
+    """这句话和一条记忆有多相关：返回 (相关度, 重合词数, 子串加分, 语义相关度)。"""
+    tokens = tokenize(memory.content)
+    overlap = len(query_tokens & tokens)
+    jaccard = overlap / max(len(query_tokens | tokens), 1)
+    substring_boost = 0.0
+    if query_norm and query_norm in (memory.content or "").lower():
+        substring_boost = 0.35
+    elif (memory.content or "").lower() in query_norm and len(memory.content) >= 4:
+        substring_boost = 0.25
+    semantic = semantic_relevance(cosine)
+    return max(min(jaccard + substring_boost, 1.0), semantic), overlap, substring_boost, semantic
+
+
 def retrieve_semantic_memories_scored(
     session: Session,
     query: str,
     *,
     limit: int = SEMANTIC_MEMORY_LIMIT,
-    touch: bool = True,
     perspectives: tuple[str, ...] | None = None,
     scopes: set[str] | None = None,
 ) -> list[tuple[float, SemanticMemory]]:
@@ -43,17 +58,9 @@ def retrieve_semantic_memories_scored(
     scored: list[tuple[float, SemanticMemory]] = []
     query_norm = (query or "").lower()
     for memory in memories:
-        tokens = tokenize(memory.content)
-        overlap = len(query_tokens & tokens)
-        jaccard = overlap / max(len(query_tokens | tokens), 1)
-        substring_boost = 0.0
-        if query_norm and query_norm in (memory.content or "").lower():
-            substring_boost = 0.35
-        elif (memory.content or "").lower() in query_norm and len(memory.content) >= 4:
-            substring_boost = 0.25
-
-        semantic = semantic_relevance(cosines.get(memory.id)) if memory.id is not None else 0.0
-        relevance = max(min(jaccard + substring_boost, 1.0), semantic)
+        relevance, overlap, substring_boost, semantic = memory_relevance(
+            query_tokens, query_norm, memory, cosines.get(memory.id) if memory.id is not None else None
+        )
         recency = math.exp(-_age_days(memory.created_at) / 21.0)
         access = min(math.log1p(memory.access_count) / 6.0, 1.0)
         emotion_salience = min(abs(memory.valence), 1.0)
@@ -61,7 +68,7 @@ def retrieve_semantic_memories_scored(
             0.22 * memory.importance
             + 0.12 * recency
             + 0.08 * access
-            + 0.08 * min(memory.strength, 1.0)
+            + 0.08 * effective_strength(memory)
             + 0.06 * emotion_salience
         ) / 0.56
         score = RELEVANCE_WEIGHT * relevance + (1 - RELEVANCE_WEIGHT) * prior
@@ -77,19 +84,8 @@ def retrieve_semantic_memories_scored(
         scored.append((score, memory))
 
     scored.sort(key=lambda item: item[0], reverse=True)
-    selected = scored[:limit]
-    memories = [memory for _, memory in selected]
-
-    if touch and memories:
-        now = utcnow()
-        for memory in memories:
-            memory.access_count += 1
-            memory.last_accessed_at = now
-        session.add_all(memories)
-        session.commit()
-        for memory in memories:
-            session.refresh(memory)
-    return selected
+    # 只读：被检索到不算强化，否则常被想起的记忆会越用越强、其余的被挤到休眠
+    return scored[:limit]
 
 
 def retrieve_semantic_memories(
@@ -97,7 +93,6 @@ def retrieve_semantic_memories(
     query: str,
     *,
     limit: int = SEMANTIC_MEMORY_LIMIT,
-    touch: bool = True,
     perspectives: tuple[str, ...] | None = None,
 ) -> list[SemanticMemory]:
     return [
@@ -106,7 +101,6 @@ def retrieve_semantic_memories(
             session,
             query,
             limit=limit,
-            touch=touch,
             perspectives=perspectives,
         )
     ]
@@ -135,9 +129,11 @@ def retrieve_episodic_memories(
         .limit(800)
     ).all()
 
+    # 用户要求忘掉或纠正过的内容，原话不再被当作旧对话想起
+    redacted = set(session.exec(select(MemoryRedaction.message_id)).all())
     scored: list[tuple[float, Message]] = []
     for message in all_messages:
-        if message.id in recent_message_ids:
+        if message.id in recent_message_ids or message.id in redacted:
             continue
         tokens = tokenize(message.content)
         jaccard = len(query_tokens & tokens) / max(len(query_tokens | tokens), 1)

@@ -5,6 +5,7 @@ from typing import Any
 from sqlmodel import Session, select
 
 from ..models import AffectionEvent, Message, RelationshipState, utcnow
+from .user_emotion import current_user_emotion
 
 
 def get_relationship_state(session: Session) -> RelationshipState:
@@ -183,4 +184,5 @@ def relationship_public(session: Session) -> dict[str, Any]:
             }
             for e in reversed(events)
         ],
+        "user_emotion": current_user_emotion(session),
     }

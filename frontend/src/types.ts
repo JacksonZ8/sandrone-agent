@@ -95,6 +95,15 @@ export interface RelationshipState {
   guidance: string;
   updated_at: string;
   events: AffectionEvent[];
+  /** 她推测的你最近的情绪（12 小时内、随时间变淡），和她自己的心情分开 */
+  user_emotion: UserEmotion | null;
+}
+
+export interface UserEmotion {
+  label: string;
+  confidence: number;
+  source: "llm" | "rule" | string;
+  observed_at: string;
 }
 
 export interface LLMConfig {
@@ -231,6 +240,49 @@ export interface AgentRunResponse {
   output: string;
   duration_ms: number;
   message: string;
+}
+
+export type AgentTaskStatus =
+  "proposed" | "running" | "completed" | "failed" | "cancelled" | "expired" | "interrupted";
+
+/** 委托给子代理的任务卡：确认后在后台执行，做完会通知。 */
+export interface AgentTask {
+  id: number;
+  title: string;
+  prompt: string;
+  spoken_summary: string;
+  command: "claude" | "codex";
+  permission: "readonly" | "write";
+  cwd: string;
+  status: AgentTaskStatus;
+  status_label: string;
+  parent_id: number | null;
+  agent_session_id: string;
+  target: "" | "codex_app";
+  target_title: string;
+  channel: string;
+  output: string;
+  error: string;
+  duration_ms: number;
+  created_at: string;
+  confirmed_at: string | null;
+  finished_at: string | null;
+  risks: string[];
+  codex_url: string;
+}
+
+export interface AgentTaskAction {
+  ok: boolean;
+  message: string;
+  task: AgentTask | null;
+}
+
+export interface CodexThread {
+  id: string;
+  title: string;
+  cwd: string;
+  updated_at_ms: number;
+  recently_active: boolean;
 }
 
 export interface SearchToolConfig {

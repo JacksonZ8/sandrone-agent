@@ -1,5 +1,8 @@
 import type {
   AgentRunResponse,
+  AgentTask,
+  AgentTaskAction,
+  CodexThread,
   AgentToolConfig,
   AppState,
   ChatResponse,
@@ -372,11 +375,22 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  approveAgentTool: (requestId: string, approved: boolean) =>
-    request<{ ok: boolean; message: string }>("/api/tools/agent/approval", {
-      method: "POST",
-      body: JSON.stringify({ request_id: requestId, approved }),
+  listAgentTasks: (limit = 20) => request<AgentTask[]>(`/api/agent-tasks?limit=${limit}`),
+
+  confirmAgentTask: (id: number) =>
+    request<AgentTaskAction>(`/api/agent-tasks/${id}/confirm`, { method: "POST" }),
+
+  cancelAgentTask: (id: number) =>
+    request<AgentTaskAction>(`/api/agent-tasks/${id}/cancel`, { method: "POST" }),
+
+  setAgentTaskThread: (id: number, threadId: string) =>
+    request<AgentTaskAction>(`/api/agent-tasks/${id}/thread`, {
+      method: "PUT",
+      body: JSON.stringify({ thread_id: threadId }),
     }),
+
+  listCodexThreads: (query = "") =>
+    request<CodexThread[]>(`/api/agent-tasks/codex-threads?q=${encodeURIComponent(query)}`),
 
   getTTSStatus: () => request<TTSStatus>("/api/tts/status"),
 

@@ -9,7 +9,7 @@ from sqlmodel import Session, func, select
 
 from ..config import RECENT_MESSAGE_LIMIT
 from ..database import engine
-from ..models import Message, utcnow
+from ..models import AgentTask, Message, utcnow
 from .llm_service import LLMError, chat_completion_stream, resolve_thinking
 from .chat_prompt import CHANNEL_HINTS, build_prompt_parts, layout_messages
 from .memory_service import estimate_importance, estimate_valence
@@ -17,14 +17,12 @@ from .message_service import delete_message
 from .provider_service import get_agent_state, get_config
 from .relationship_service import apply_conversation_affection
 from .style_guard import recent_repetition_block
+from .agent_tasks import propose_task, resolve_card_by_utterance, task_public
 from .tool_service import (
-    AGENT_APPROVAL_TIMEOUT_SECONDS,
     active_tool_schemas,
-    create_agent_approval,
     execute_tool_call,
     get_tool_config,
     run_tool_requests,
-    wait_for_agent_approval,
 )
 
 
@@ -244,13 +242,21 @@ async def create_chat_turn_stream(
         tool_traces: list[dict[str, Any]] = []
         memory_traces: list[dict[str, Any]] = []
         tool_context = run_tool_requests(session, content) if config.provider == "mock" else ""
+        # 紧接着任务卡说“确认/取消”：直接处理，再让她顺口回应一句
+        task_context = ""
+        if existing_user_message is None:
+            task_context, decided = resolve_card_by_utterance(
+                session, content, channel=channel, exclude_message_id=user_message.id
+            )
+            if decided is not None:
+                yield {"type": "agent_task", "task": decided}
         variety_context = recent_repetition_block(
             (message.content for message in recent if message.role == "assistant"),
             content,
         )
         channel_context = CHANNEL_HINTS.get(channel, "")
         extra_context = "\n\n".join(
-            part for part in (channel_context, style_context, tool_context, variety_context) if part
+            part for part in (channel_context, style_context, tool_context, task_context, variety_context) if part
         )
         static_prompt, dynamic_prompt = build_prompt_parts(
             session,
@@ -302,11 +308,8 @@ async def create_chat_turn_stream(
             }
             llm_messages.append(assistant_tool_message)
 
-            def needs_approval(call: dict[str, Any]) -> bool:
-                return call["name"] == "delegate_agent" and tool_config.agent_permission == "write"
-
-            # 只读工具（搜索、读网页、读文件、看屏幕）同一轮里并行执行；需要确认的写入仍逐个处理
-            parallel = [call for call in tool_calls if not needs_approval(call)]
+            # 只读工具（搜索、读网页、读文件、看屏幕）同一轮里并行执行；委托子代理只生成任务卡，单独处理
+            parallel = [call for call in tool_calls if call["name"] != "delegate_agent"]
             for call in parallel:
                 yield {"type": "tool_call", "name": call["name"], "arguments": call.get("arguments") or {}}
             parallel_outcomes = await asyncio.gather(
@@ -320,39 +323,12 @@ async def create_chat_turn_stream(
 
                 if id(call) in outcomes_by_call:
                     outcome = outcomes_by_call[id(call)]
-                elif channel == "web":
-                    request_id = create_agent_approval()
-                    yield {
-                        "type": "tool_call",
-                        "name": call["name"],
-                        "arguments": arguments,
-                        "requires_confirmation": True,
-                        "request_id": request_id,
-                        "confirmation_timeout_seconds": AGENT_APPROVAL_TIMEOUT_SECONDS,
-                    }
-                    approved = await wait_for_agent_approval(request_id)
-                    yield {
-                        "type": "approval_result",
-                        "request_id": request_id,
-                        "approved": bool(approved),
-                    }
-                    if approved is True:
-                        outcome = await asyncio.to_thread(
-                            execute_tool_call,
-                            session,
-                            call["name"],
-                            arguments,
-                        )
-                    else:
-                        reason = (
-                            "用户拒绝了这次写入。"
-                            if approved is False
-                            else "写入确认请求已失效或等待超时，本次未执行。"
-                        )
-                        outcome = {"ok": False, "error": reason}
                 else:
                     yield {"type": "tool_call", "name": call["name"], "arguments": arguments}
-                    outcome = {"ok": False, "error": "写入模式需要用户在网页端确认；当前渠道不支持，请改用网页发起。"}
+                    outcome = propose_task(session, arguments, channel=channel)
+                    card = session.get(AgentTask, outcome["task_id"]) if outcome.get("ok") else None
+                    if card is not None:
+                        yield {"type": "agent_task", "task": task_public(card)}
 
                 content_payload = json.dumps(outcome, ensure_ascii=False, default=str)
                 tool_traces.append(

@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import math
 import re
 from typing import Any
 
@@ -13,32 +12,28 @@ from ...database import engine
 from ...models import MemoryConsolidationRun, MemoryLink, SemanticMemory, utcnow
 from ..llm_service import chat_completion
 from ..provider_service import get_agent_state, get_config
-from .common import _age_days, _age_hours, _token_similarity
+from .common import FORGET_THRESHOLD, _age_days, _age_hours, _token_similarity, effective_strength
 from .embedding import similar_memory_pairs
 
 logger = logging.getLogger(__name__)
 
 
 def apply_forgetting(session: Session) -> int:
-    """按重要度决定半衰期；长期未被唤起的低强度记忆会休眠，而不是被物理删除。"""
+    """按重要度决定半衰期；长期没被用户重提、当前强度过低的记忆会休眠，而不是被物理删除。
+
+    当前强度从锚点算起（见 effective_strength），这里不回写 strength：
+    每 12 小时跑一次也不会把衰减反复叠乘。
+    """
     memories = session.exec(select(SemanticMemory).where(SemanticMemory.status == "active")).all()
     now = utcnow()
     suppressed = 0
     for memory in memories:
-        last_used = memory.last_accessed_at or memory.created_at
-        age_days = _age_days(last_used)
-        # 重要记忆保留更久：7 天起步，最高约 127 天
-        half_life_days = 7.0 + memory.importance * 120.0
-        decay = math.exp(-age_days / half_life_days)
-        effective = round(memory.strength * decay, 4)
-        if effective <= 0.12:
+        if effective_strength(memory) <= FORGET_THRESHOLD:
             memory.status = "suppressed"
-            reason = "因长期未唤起而进入休眠"
+            reason = "因长期未被提起而进入休眠"
             memory.notes = f"{memory.notes} | {reason}".strip(" |")
             suppressed += 1
-        else:
-            memory.strength = effective
-        session.add(memory)
+            session.add(memory)
 
     state = get_agent_state(session)
     state.last_forgetting_at = now
@@ -106,7 +101,7 @@ def _apply_consolidation_actions(session: Session, actions: list[dict[str, Any]]
                         confidence=max(m.confidence for m in memories),
                         importance=max(m.importance for m in memories),
                         valence=sum(m.valence for m in memories) / len(memories),
-                        strength=max(m.strength for m in memories),
+                        strength=round(max(effective_strength(m) for m in memories), 4),
                         status="active",
                         notes="由记忆整理合并",
                     )
@@ -215,7 +210,7 @@ def _consolidate_with_session(session: Session, trigger: str) -> MemoryConsolida
         run.status = "success" if actions else "skipped"
     else:
         memory_block = "\n".join(
-            f"#{m.id} [{m.perspective}][{m.type}] strength={m.strength:.2f} access={m.access_count} "
+            f"#{m.id} [{m.perspective}][{m.type}] strength={effective_strength(m):.2f} access={m.access_count} "
             f"importance={m.importance:.2f} valence={m.valence:.2f} age_days={_age_days(m.created_at):.1f} "
             f"content={m.content}"
             for m in memories[:60]

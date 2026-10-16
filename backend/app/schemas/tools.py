@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -117,11 +119,44 @@ class AgentRunResponse(BaseModel):
     message: str = ""
 
 
-class AgentApprovalRequest(BaseModel):
-    request_id: str = Field(min_length=8, max_length=64)
-    approved: bool
+class AgentTaskPublic(BaseModel):
+    id: int
+    title: str
+    prompt: str
+    spoken_summary: str
+    command: str
+    permission: str
+    cwd: str
+    status: str
+    status_label: str
+    parent_id: int | None
+    agent_session_id: str
+    target: str
+    target_title: str
+    channel: str
+    output: str
+    error: str
+    duration_ms: int
+    created_at: datetime
+    confirmed_at: datetime | None
+    finished_at: datetime | None
+    risks: list[str]
+    codex_url: str
 
 
-class AgentApprovalResponse(BaseModel):
+class AgentTaskActionResponse(BaseModel):
     ok: bool
-    message: str = ""
+    message: str
+    task: AgentTaskPublic | None = None
+
+
+class CodexThreadPublic(BaseModel):
+    id: str
+    title: str
+    cwd: str
+    updated_at_ms: int
+    recently_active: bool
+
+
+class AgentTaskThreadUpdate(BaseModel):
+    thread_id: str = Field(default="", max_length=64)  # 空字符串表示不接着 App 线程

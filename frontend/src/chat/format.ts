@@ -45,6 +45,8 @@ const TOOL_LABELS: Record<string, string> = {
   note_game_knowledge: "记下游戏知识",
   look_at_screen: "看屏幕",
   delegate_agent: "委托子代理",
+  forget_memory: "忘掉记忆",
+  correct_memory: "改正记忆",
 };
 
 export function toolLabel(name: string): string {

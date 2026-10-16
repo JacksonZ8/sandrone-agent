@@ -57,10 +57,14 @@ class AgentDelegationSecurityTests(unittest.TestCase):
         for command, expected_flag in (("claude", "plan"), ("codex", "read-only")):
             with self.subTest(command=command), tempfile.TemporaryDirectory() as tmp:
                 config = self._config(command, Path(tmp))
-                completed = SimpleNamespace(returncode=0, stdout="done", stderr="")
+                stdout = '{"type": "result", "result": "done", "session_id": "s1"}' if command == "claude" else (
+                    '{"type": "thread.started", "thread_id": "t1"}\n'
+                    '{"type": "item.completed", "item": {"type": "agent_message", "text": "done"}}'
+                )
+                # 打桩到进程层：测试绝不能真的拉起本机的 claude / codex
                 with (
-                    patch.object(delegation.shutil, "which", return_value=f"/usr/local/bin/{command}"),
-                    patch.object(delegation.subprocess, "run", return_value=completed) as run,
+                    patch.object(delegation, "agent_executable", return_value=f"/usr/local/bin/{command}"),
+                    patch.object(delegation, "_run_process", return_value=(0, stdout, "")) as run,
                     patch.object(delegation, "_record_tool_call") as record,
                 ):
                     result = tool_service.run_delegate_agent(

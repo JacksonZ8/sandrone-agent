@@ -7,7 +7,6 @@ from sqlmodel import Session
 
 from ...models import ToolConfig
 from .config import get_tool_config
-from .delegation import run_delegate_agent
 from .files import read_file_with_audit
 from .screen import analyze_screen
 from .search import search_web_with_audit
@@ -73,6 +72,35 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "forget_memory",
+            "description": "用户明确要你忘掉、别再记得某件事时调用：相关的长期记忆不再被想起（数据库里保留，不物理删除），相关的旧对话也不再被想起。只在用户明确提出时使用，不要自己决定忘掉什么。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "要忘掉的内容，用用户的原话或关键词"},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "correct_memory",
+            "description": "用户指出你记错了某件事时调用：把记错的那条长期记忆换成正确的。只在用户明确纠正时使用。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "wrong": {"type": "string", "description": "记错的内容，用关键词或你原来的说法"},
+                    "correct": {"type": "string", "description": "正确的内容，写成一条完整的记忆，例如“用户住在广州。”"},
+                },
+                "required": ["wrong", "correct"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "look_at_screen",
             "description": "截取用户当前电脑屏幕（设了“陪你用电脑”应用名单时只截名单内最前面的窗口）并用视觉模型分析。仅在用户明确要求看当前屏幕、当前界面、窗口或视觉内容时使用。如果用户问的是桌面/目录里有哪些文件、文件内容，请优先使用 read_file。",
             "parameters": {
@@ -88,14 +116,18 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "delegate_agent",
-            "description": "派一个本地 CLI 子代理（Claude Code 或 Codex）在授权目录里做项目级、跨文件的代码/文档分析与修改，并返回文字摘要。权限由用户配置决定：只读模式不写文件；写入模式允许修改授权工作目录内的文件，但每次调用都必须先经过用户在网页上确认。仅在单个 read_file 不足以完成任务时才使用；任务复杂、涉及整个目录或需要深入推理时使用。",
+            "description": "把项目级、跨文件的代码/文档分析或修改交给本地 CLI 子代理（Claude Code 或 Codex）。调用后只会生成一张任务卡，不会立刻执行、也不会马上有结果：用户确认后在后台执行，做完会通知。权限由用户配置决定：只读模式不写文件；写入模式可以修改授权目录内的文件。仅在单个 read_file 不足以完成任务时才使用。",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "prompt": {"type": "string", "description": "交给子代理的完整任务，包含目标、关注点、希望返回的格式"},
-                    "cwd": {"type": "string", "description": "要分析的项目目录；留空则使用设置中的第一个允许目录"}
+                    "prompt": {"type": "string", "description": "交给子代理的完整任务，包含目标、关注点、希望返回的格式；要保留用户要求的最终用途和约束，不要替子代理先做答"},
+                    "title": {"type": "string", "description": "任务卡标题，十来个字的中文短语"},
+                    "spoken_summary": {"type": "string", "description": "一句口语化的中文摘要，说清让谁做什么、在哪个项目、有什么重要约束；语音通话里会照着念给用户确认"},
+                    "cwd": {"type": "string", "description": "要处理的项目目录；留空则使用设置中的第一个允许目录。续接任务或接着 Codex App 线程时忽略"},
+                    "continue_task_id": {"type": "integer", "description": "接着之前某个子代理任务继续（同一个会话，记得上次做了什么）时填它的编号"},
+                    "codex_thread": {"type": "string", "description": "用户明确要接着他在 Codex App 里的某个已有线程继续时，填线程标题里的关键词或线程 id；没提就不要填"}
                 },
-                "required": ["prompt"],
+                "required": ["prompt", "title", "spoken_summary"],
             },
         },
     },
@@ -144,7 +176,7 @@ def run_tool_requests(session: Session, text: str) -> str:
 
 def active_tool_schemas(config: ToolConfig) -> list[dict[str, Any]]:
     """只把当前已开启的工具定义交给模型，关闭的能力不进入工具列表。"""
-    names = {"web_search", "web_fetch"}
+    names = {"web_search", "web_fetch", "forget_memory", "correct_memory"}
     if config.files_enabled:
         names.add("read_file")
     if config.screen_enabled:
@@ -154,7 +186,7 @@ def active_tool_schemas(config: ToolConfig) -> list[dict[str, Any]]:
     return [schema for schema in TOOL_SCHEMAS if schema["function"]["name"] in names]
 
 
-def execute_tool_call(session: Session, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+def execute_tool_call(session: Session, name: str, arguments: dict[str, Any], *, channel: str = "web") -> dict[str, Any]:
     config = get_tool_config(session)
     if name == "read_file":
         path = str(arguments.get("path") or "").strip()
@@ -200,6 +232,16 @@ def execute_tool_call(session: Session, name: str, arguments: dict[str, Any]) ->
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "url": url, "error": str(exc)[:300]}
 
+    if name == "forget_memory":
+        from ..memory.revision import forget_memories
+
+        return forget_memories(session, str(arguments.get("query") or ""))
+
+    if name == "correct_memory":
+        from ..memory.revision import correct_memory
+
+        return correct_memory(session, str(arguments.get("wrong") or ""), str(arguments.get("correct") or ""))
+
     if name == "look_at_screen":
         question = str(arguments.get("question") or "看看我现在的屏幕，告诉我当前在做什么。").strip()
         result = analyze_screen(session, question)
@@ -208,14 +250,8 @@ def execute_tool_call(session: Session, name: str, arguments: dict[str, Any]) ->
         return {"ok": False, "error": result["message"]}
 
     if name == "delegate_agent":
-        prompt = str(arguments.get("prompt") or "").strip()
-        if not prompt:
-            return {"ok": False, "error": "子代理任务为空。"}
-        cwd = str(arguments.get("cwd") or "").strip()
-        result = run_delegate_agent(session, prompt, cwd, config)
-        if result["ok"]:
-            preview = f"{result['cwd']} · {prompt[:80]}"
-            return {"ok": True, "preview": preview, "output": result["output"], "duration_ms": result["duration_ms"]}
-        return {"ok": False, "error": result["message"]}
+        from ..agent_tasks import propose_task
+
+        return propose_task(session, arguments, channel=channel)
 
     return {"ok": False, "error": f"未知工具：{name}"}

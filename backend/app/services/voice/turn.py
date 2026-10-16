@@ -8,7 +8,8 @@ from typing import Any
 
 from sqlmodel import Session
 
-from ...models import Message
+from ...models import AgentTask, Message
+from ..agent_tasks import propose_task, resolve_card_by_utterance, task_public
 from ..chat_prompt import CHANNEL_HINTS, build_prompt_parts, layout_messages
 from ..chat_service import _finish_assistant_message, get_recent_messages, next_turn_index
 from ..llm_service import chat_completion_stream, resolve_thinking
@@ -45,7 +46,7 @@ async def stream_voice_reply(
     """流式生成通话回复：逐段产出 {"type": "delta"} 与 {"type": "tool_call"}，结果累积在 reply 里。
 
     用户这句话此时还没写入时间线（被打断合并时可能作废），所以手动追加到上下文末尾。
-    写入类子代理在通话里不能确认，直接告诉模型改用网页。
+    委托子代理只生成任务卡；紧接着说“确认/取消”就直接处理（见 agent_tasks）。
     """
     config = get_config(session)
     recent = get_recent_messages(session, aligned=True)
@@ -53,7 +54,10 @@ async def stream_voice_reply(
     variety = recent_repetition_block(
         (message.content for message in recent if message.role == "assistant"), user_text
     )
-    extra = "\n\n".join(part for part in (CHANNEL_HINTS[CHANNEL], style_context, variety) if part)
+    task_context, decided = resolve_card_by_utterance(session, user_text, channel=CHANNEL)
+    if decided is not None:
+        yield {"type": "agent_task", "task": decided}
+    extra = "\n\n".join(part for part in (CHANNEL_HINTS[CHANNEL], style_context, task_context, variety) if part)
     static_prompt, dynamic_prompt = build_prompt_parts(
         session, user_text, recent_ids, extra, memory_trace_collector=reply.memory_traces
     )
@@ -105,11 +109,11 @@ async def stream_voice_reply(
         )
         for index, call in enumerate(calls):
             yield {"type": "tool_call", "name": call["name"], "arguments": call["arguments"]}
-            if call["name"] == "delegate_agent" and tool_config.agent_permission == "write":
-                outcome: dict[str, Any] = {
-                    "ok": False,
-                    "error": "写入模式需要用户在网页文字对话里确认；通话中不能执行，请让对方改用文字发起。",
-                }
+            if call["name"] == "delegate_agent":
+                outcome: dict[str, Any] = propose_task(session, call["arguments"], channel=CHANNEL)
+                card = session.get(AgentTask, outcome["task_id"]) if outcome.get("ok") else None
+                if card is not None:
+                    yield {"type": "agent_task", "task": task_public(card)}
             else:
                 outcome = await asyncio.to_thread(execute_tool_call, session, call["name"], call["arguments"])
             payload = json.dumps(outcome, ensure_ascii=False, default=str)

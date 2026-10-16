@@ -39,6 +39,19 @@ FILLERS = ("嗯……", "让我想想。", "唔……")
 
 _filler_cache: dict[str, tuple[int, bytes]] = {}
 
+# 正在进行的通话：子代理任务做完时，在通话里顺口说一声
+ACTIVE_CALLS: set["VoiceCall"] = set()
+# 等她说完、你也没在说话时再播报；隔这么久看一次
+NOTICE_POLL_S = 0.5
+
+
+async def announce_to_calls(text: str, message: dict[str, Any] | None = None) -> int:
+    """在所有进行中的通话里播报一句（只保留最新的一条，不积压）；返回通知到的通话数。"""
+    calls = [call for call in ACTIVE_CALLS if not call.closed]
+    for call in calls:
+        call.queue_notice(text, message)
+    return len(calls)
+
 
 def _meaningful(text: str) -> str:
     return re.sub(r"[\s，。？！、,.?!…]+", "", text or "")
@@ -102,6 +115,8 @@ class VoiceCall:
         self.interrupt_reason = ""
         self.muted = False
         self.closed = False
+        self.pending_notice: tuple[str, dict[str, Any] | None] | None = None
+        self.notice_waiter: asyncio.Task | None = None
 
     # ---------- 收发 ----------
 
@@ -119,6 +134,7 @@ class VoiceCall:
 
     async def run(self) -> None:
         await self.ws.accept()
+        ACTIVE_CALLS.add(self)
         try:
             if not await asyncio.to_thread(self.asr.load):
                 await self.send({"type": "error", "message": self.asr.error, "fatal": True})
@@ -143,6 +159,9 @@ class VoiceCall:
             logger.exception("voice call failed")
         finally:
             self.closed = True
+            ACTIVE_CALLS.discard(self)
+            if self.notice_waiter is not None:
+                self.notice_waiter.cancel()
             await self.cancel_turn()
             self.executor.shutdown(wait=False, cancel_futures=True)
 
@@ -222,6 +241,53 @@ class VoiceCall:
             await self.send({"type": "interrupt", "turn": self.turn_id})
             await self.send({"type": "state", "state": "listening"})
 
+    # ---------- 播报 ----------
+
+    def queue_notice(self, text: str, message: dict[str, Any] | None = None) -> None:
+        """记下要播报的一句；新的覆盖旧的。等她说完、你也没在说话时再念。"""
+        self.pending_notice = (text, message)
+        if self.notice_waiter is None or self.notice_waiter.done():
+            self.notice_waiter = asyncio.create_task(self._wait_to_announce())
+
+    @property
+    def can_announce(self) -> bool:
+        user_speaking = self.transcriber is not None and self.transcriber.active
+        return not self.closed and not self.she_is_busy and not user_speaking
+
+    async def _wait_to_announce(self) -> None:
+        while self.pending_notice is not None and not self.closed:
+            if self.can_announce:
+                text, message = self.pending_notice
+                self.pending_notice = None
+                self.turn_id += 1
+                self.turn_task = asyncio.create_task(self.speak_notice(self.turn_id, text, message))
+                return
+            await asyncio.sleep(NOTICE_POLL_S)
+
+    async def speak_notice(self, turn_id: int, text: str, message: dict[str, Any] | None) -> None:
+        """念一句通知：不经过模型，消息已经在时间线里，只同步给通话界面。可以像平常一样被打断。"""
+        await self.send({"type": "state", "state": "thinking", "turn": turn_id})
+        await self.send({"type": "sentence", "turn": turn_id, "text": text})
+        started = False
+        try:
+            async for rate, pcm in stream_tts_pcm(text):
+                if not started:
+                    started = True
+                    await self.send({"type": "audio_begin", "turn": turn_id, "sample_rate": rate})
+                    await self.send({"type": "state", "state": "speaking", "turn": turn_id})
+                self.audible_until = max(self.audible_until, time.monotonic()) + len(pcm) / 2 / rate
+                await self.send_audio(pcm)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001
+            logger.warning("notice tts failed", exc_info=True)
+            await self.send({"type": "tts_skipped", "turn": turn_id, "text": text})
+        if started:
+            await self.send({"type": "audio_end", "turn": turn_id})
+        else:
+            await self.send({"type": "state", "state": "listening"})
+        await self.send({"type": "turn_done", "interrupted": False, "user_message": None, "assistant_message": message})
+
     # ---------- 说 ----------
 
     async def run_turn(self, turn_id: int, user_text: str, ended_at: float) -> None:
@@ -272,6 +338,8 @@ class VoiceCall:
                         await queue.put(piece)
                 elif event["type"] == "tool_call":
                     await self.send({"type": "tool", "name": event["name"]})
+                elif event["type"] == "agent_task":
+                    await self.send({"type": "agent_task", "task": event["task"]})
             for piece in splitter.feed(tags.flush()) + splitter.flush():
                 await queue.put(piece)
             await queue.put(None)

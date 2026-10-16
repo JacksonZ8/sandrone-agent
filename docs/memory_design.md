@@ -47,10 +47,12 @@ lexical   = min(关键词Jaccard + 子串加成, 1)
 semantic  = clamp((cos(这句话, 记忆) - 0.42) / (0.68 - 0.42), 0, 1)   # 有本地向量模型时
 relevance = max(lexical, semantic)
 prior     = (0.22 * importance + 0.12 * exp(-age_days / 21)
-             + 0.08 * min(log1p(access_count) / 6, 1) + 0.08 * min(strength, 1)
+             + 0.08 * min(log1p(access_count) / 6, 1) + 0.08 * current_strength
              + 0.06 * min(|valence|, 1)) / 0.56
 score     = 0.65 * relevance + 0.35 * prior
 ```
+
+检索只读：被检索到不会增加 `access_count`，也不会刷新衰减锚点。
 
 以 `backend/app/services/memory/retrieval.py` 为准；字面和语义都不相关、且得分低于 0.25 的记忆不进入候选。
 
@@ -74,11 +76,26 @@ score     = 0.65 * relevance + 0.35 * prior
 
 ## M3 已实现
 
-- Ebbinghaus 遗忘曲线：`strength` 按重要度半衰期衰减；低强度且长期未唤起的记忆进入休眠，不物理删除。
+- Ebbinghaus 遗忘曲线：`strength` 是上次巩固（创建或被用户重提）时的锚点值，当前强度 `current_strength = min(strength, 1) × exp(-距锚点天数 / (7 + 120 × importance))`，只读计算、不回写，所以每 12 小时检查一次也不会叠乘。当前强度 ≤ 0.12 的记忆进入休眠，不物理删除。
+- 强化只在用户主动重提时发生：提取模型把用户这一轮重提或确认的已有记忆编号放进 `reaffirmed`，或者用户视角的新候选与已有记忆字面重复。强化后 `strength = s + 0.2 × (1 - s)`（s 为当前强度），锚点移到此刻，`access_count` 加一。桑多涅自己视角的重复不算。思路参考 [AAAAGENT](https://github.com/phoiex/AAAAGENT) 的记忆动态设计（只借鉴思路，未复用代码）。
 - 情绪显著度：`valence` 参与检索评分，情绪越强的记忆越容易被唤起。
 - 反思层：她定期写第一人称日记；日记后自动进行记忆整理。
 - 记忆联想：新记忆与相关旧记忆自动建立 `memory_links`。
 - 记忆整理：`POST /api/memories/consolidate` 可合并重复、休眠过时/矛盾记忆、建立联想。
+
+## 对话里的遗忘与纠正（已实现）
+
+- 用户明确说“忘掉……”时，她调用 `forget_memory`：相关度 ≥ 0.5 的活跃或休眠记忆（最多 5 条）改为 `forgotten`；说“你记错了”时调用 `correct_memory`：记错的那条改为 `corrected`，另存一条正确的新记忆（几条都像时先问清是哪条）。两种状态都不物理删除。
+- 被忘掉或纠正的记忆，其来源消息记进 `memory_redactions`，不再被当作旧对话片段想起；提出请求的那句话也一样。时间线里原文照旧。
+- 调用过这两个工具的回合不做记忆提取，免得把要忘的又记回来。
+- 防止“复活”：来源早于遗忘/纠正时间、内容又与被忘掉的记忆重复的候选会被丢弃（例如遗忘时还在后台跑的上一轮提取）；之后用户自己重新说起，照常记住。
+
+## 对方的情绪（已实现）
+
+- 和她自己的心情（`agent_state.mood`）分开记。每条用户消息在 `messages.emotion_tags` 里记一次观察：`{"label", "confidence", "source"}`，标签取 平静、开心、兴奋、难过、生气、焦虑、疲惫、惊讶。
+- 来源优先用后台记忆提取那次模型调用顺带给出的 `user_emotion`（不额外调用模型）；那次没跑（短句、mock）或看不出来时，按明显用词粗判（置信度 0.45，前面带“不/没/别”的不算）。
+- “对方最近的情绪”取 12 小时内最近一次观察，置信度按 3 小时半衰期衰减，低于 0.25 就当已经过去。非“平静”时作为背景进入提示，提醒她体会着回应、不必点破、不要被带着走。
+- “她的资料”页的“你们之间”卡片会显示她推测的这条情绪。
 
 ## 记忆痕迹（已实现）
 

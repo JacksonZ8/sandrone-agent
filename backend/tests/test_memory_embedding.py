@@ -79,24 +79,24 @@ class SemanticMemoryTests(unittest.TestCase):
         with Session(self.engine) as session:
             job = self._add(session, "他在找工作，最近面试很多")
             self._add(session, "他喜欢深蓝色的界面", importance=0.9)
-            ranked = retrieve_semantic_memories_scored(session, "今天好累", touch=False)
+            ranked = retrieve_semantic_memories_scored(session, "今天好累")
             self.assertEqual(ranked[0][1].id, job.id)
             with patch.object(embedding, "get_embedder", return_value=None):
                 embedding.embed_query.cache_clear()
-                lexical = retrieve_semantic_memories_scored(session, "今天好累", touch=False)
+                lexical = retrieve_semantic_memories_scored(session, "今天好累")
             self.assertNotIn(job.id, [memory.id for _, memory in lexical])  # 纯分词想不起来
 
     def test_vectors_are_cached_and_recomputed_when_content_changes(self) -> None:
         with Session(self.engine) as session:
             memory = self._add(session, "他养了一只猫")
-            retrieve_semantic_memories_scored(session, "宠物", touch=False)
-            retrieve_semantic_memories_scored(session, "宠物还好吗", touch=False)
+            retrieve_semantic_memories_scored(session, "宠物")
+            retrieve_semantic_memories_scored(session, "宠物还好吗")
             memory_batches = [batch for batch in self.fake.calls if "他养了一只猫" in batch]
             self.assertEqual(len(memory_batches), 1)  # 第二次检索用缓存
             memory.content = "他工作压力很大"
             session.add(memory)
             session.commit()
-            ranked = retrieve_semantic_memories_scored(session, "好累", touch=False)
+            ranked = retrieve_semantic_memories_scored(session, "好累")
             self.assertEqual(ranked[0][1].id, memory.id)
             row = session.get(MemoryEmbedding, memory.id)
             self.assertEqual(row.content_hash, embedding.content_hash("他工作压力很大"))

@@ -68,6 +68,13 @@ class AffectionEventPublic(BaseModel):
     created_at: datetime
 
 
+class UserEmotionPublic(BaseModel):
+    label: str
+    confidence: float
+    source: str
+    observed_at: datetime
+
+
 class RelationshipPublic(BaseModel):
     affection: float
     familiarity: float
@@ -76,6 +83,7 @@ class RelationshipPublic(BaseModel):
     guidance: str
     updated_at: datetime
     events: list[AffectionEventPublic]
+    user_emotion: UserEmotionPublic | None = None
 
 
 class ReflectResponse(BaseModel):

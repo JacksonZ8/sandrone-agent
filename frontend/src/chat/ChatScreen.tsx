@@ -6,12 +6,12 @@ import type { AppState, Message } from "../types";
 import { api } from "../api";
 import ConfirmDialog from "../ui/ConfirmDialog";
 import ui from "../ui/ui.module.css";
-import ApprovalCard from "./ApprovalCard";
 import styles from "./ChatScreen.module.css";
 import Composer from "./Composer";
 import { dayLabel } from "./format";
 import LiveStatus from "./LiveStatus";
 import MessageItem from "./MessageItem";
+import TaskTray from "./TaskTray";
 import { useChatStream } from "./useChatStream";
 import { useTimeline } from "./useTimeline";
 import { useVoice } from "./useVoice";
@@ -78,11 +78,20 @@ export default function ChatScreen({ appState, onStateChange }: Props) {
   }, []);
 
   const { remove } = timeline;
+  // 任务卡托盘在她给出或处理任务卡、以及每轮对话结束时重新读取
+  const [taskSignal, setTaskSignal] = useState(0);
+  const bumpTasks = useCallback(() => setTaskSignal((value) => value + 1), []);
+  const onStreamDone = useCallback(() => {
+    onStateChange();
+    bumpTasks();
+  }, [bumpTasks, onStateChange]);
+
   const stream = useChatStream({
     onMessages: timeline.append,
     onReply,
     onReplaced: remove,
-    onDone: onStateChange,
+    onDone: onStreamDone,
+    onTask: bumpTasks,
   });
 
   const lastId = timeline.messages[timeline.messages.length - 1]?.id ?? 0;
@@ -218,17 +227,10 @@ export default function ChatScreen({ appState, onStateChange }: Props) {
             <LiveStatus
               events={stream.events}
               startedAt={stream.startedAt}
-              awaitingApproval={Boolean(stream.approval)}
               partial={stream.partial}
             />
           )}
-          {stream.approval && (
-            <ApprovalCard
-              approval={stream.approval}
-              busy={stream.approvalBusy}
-              onAnswer={(approved) => void stream.answerApproval(approved)}
-            />
-          )}
+          <TaskTray signal={taskSignal} />
           {error && (
             <div className={ui.error} role="alert">
               {error}

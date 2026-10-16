@@ -142,7 +142,7 @@ API Key 只保存在本机 SQLite 中，接口只回传掩码和后 4 位。
   ├─ 去重入库，来源可追溯
   ├─ 字面或意思相近的记忆自动建立联想边（memory_links）
   ├─ 每 10 轮或间隔超过 20 小时，她写一篇只属于自己的日记
-  └─ 遗忘曲线按重要度衰减；低强度且长期未唤起的记忆进入休眠
+  └─ 遗忘曲线按重要度衰减；长期没被用户重提、强度过低的记忆进入休眠
 ```
 
 ## 主要接口
@@ -184,7 +184,11 @@ API Key 只保存在本机 SQLite 中，接口只回传掩码和后 4 位。
 | GET | `/api/tools/agent/config` | 子代理配置与 CLI 检测 |
 | PUT | `/api/tools/agent/config` | 更新子代理配置 |
 | POST | `/api/tools/agent/run` | 手动派一次只读子代理 |
-| POST | `/api/tools/agent/approval` | 处理网页端写入确认（允许/拒绝） |
+| GET | `/api/agent-tasks` | 最近的子代理任务卡与结果 |
+| GET | `/api/agent-tasks/codex-threads` | 只读列出 Codex App 里的已有线程 |
+| POST | `/api/agent-tasks/{id}/confirm` | 确认任务卡并在后台执行（只生效一次） |
+| POST | `/api/agent-tasks/{id}/cancel` | 取消任务卡或停止执行 |
+| PUT | `/api/agent-tasks/{id}/thread` | 确认前改成接着某个 Codex App 线程或新开会话 |
 | GET | `/api/wechat/status` | 微信连接状态 |
 | POST | `/api/wechat/login/start` | 获取微信登录二维码 |
 | GET | `/api/wechat/login/status` | 查询扫码结果 |

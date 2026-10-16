@@ -30,7 +30,11 @@ class ToolServiceCompatibilityTests(unittest.TestCase):
             schema["function"]["name"]
             for schema in tool_service.active_tool_schemas(config)
         }
-        self.assertEqual(names, {"read_file", "web_search", "web_fetch", "delegate_agent"})
+        # 忘掉/改正记忆不受开关控制，总是可用
+        self.assertEqual(
+            names,
+            {"read_file", "web_search", "web_fetch", "delegate_agent", "forget_memory", "correct_memory"},
+        )
 
     def test_agent_allowlist_parser_ignores_missing_directories(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

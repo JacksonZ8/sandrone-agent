@@ -8,8 +8,6 @@ from sqlmodel import Session
 from ..database import get_session
 from ..models import ToolConfig, utcnow
 from ..schemas import (
-    AgentApprovalRequest,
-    AgentApprovalResponse,
     AgentRunRequest,
     AgentRunResponse,
     AgentToolConfig,
@@ -33,7 +31,6 @@ from ..services.tool_service import (
     file_tool_public,
     get_tool_config,
     read_file_with_audit,
-    resolve_agent_approval,
     run_delegate_agent,
     screen_tool_public,
     search_tool_public,
@@ -148,14 +145,3 @@ def run_agent(payload: AgentRunRequest, session: Session = Depends(get_session))
         get_tool_config(session),
         permission_override="readonly",
     )
-
-
-@router.post("/agent/approval", response_model=AgentApprovalResponse)
-async def approve_agent_run(payload: AgentApprovalRequest) -> dict:
-    resolved = await resolve_agent_approval(payload.request_id, payload.approved)
-    if not resolved:
-        return {"ok": False, "message": "该写入确认请求不存在、已过期或已经处理过。"}
-    return {
-        "ok": True,
-        "message": "已允许这次写入。" if payload.approved else "已拒绝这次写入。",
-    }

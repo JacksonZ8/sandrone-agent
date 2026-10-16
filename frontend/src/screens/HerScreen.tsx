@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { Route } from "../app/route";
 import { usePrefs } from "../prefs/prefs";
+import { timeLabel } from "../chat/format";
 import { useLive2DStatus } from "../live2d/status";
 import { currentSubscription, disablePush, enablePush, pushSupport } from "../pushNotifications";
 import CharacterStage from "../stage/CharacterStage";
@@ -157,6 +158,13 @@ export default function HerScreen({ appState, navigate }: Props) {
             <span>熟悉 {percent(relationship.familiarity)}</span>
             <span>信任 {percent(relationship.trust)}</span>
           </div>
+          {relationship.user_emotion && (
+            <p className={ui.hint}>
+              她觉得你最近有点{relationship.user_emotion.label}（
+              {relationship.user_emotion.source === "llm" ? "从你的话推测" : "从用词粗略判断"}，
+              {timeLabel(relationship.user_emotion.observed_at)}）
+            </p>
+          )}
         </section>
       )}
 

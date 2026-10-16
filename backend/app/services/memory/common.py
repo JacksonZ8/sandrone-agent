@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any
@@ -86,6 +87,32 @@ def _age_hours(value: datetime | None) -> float:
     return _age_days(value) * 24.0
 
 
+FORGET_THRESHOLD = 0.12  # 当前强度低于它的记忆进入休眠
+REINFORCE_RATE = 0.2     # 用户重提一次，把当前强度朝 1 拉近两成
+
+
+def memory_half_life_days(memory: SemanticMemory) -> float:
+    """重要记忆保留更久：7 天起步，最高约 127 天。"""
+    return 7.0 + memory.importance * 120.0
+
+
+def effective_strength(memory: SemanticMemory) -> float:
+    """当前强度：strength 是上次巩固（创建或被用户重提）时的锚点值，从那一刻起按天衰减。
+
+    只读计算、不回写；反复计算不会让衰减叠加。
+    """
+    anchor = memory.last_accessed_at or memory.created_at
+    return min(memory.strength, 1.0) * math.exp(-_age_days(anchor) / memory_half_life_days(memory))
+
+
+def reinforce_memory(memory: SemanticMemory, now: datetime) -> None:
+    """用户主动重提或确认这条记忆：以当前强度为起点强化，并把衰减锚点移到现在。"""
+    current = effective_strength(memory)
+    memory.strength = round(current + REINFORCE_RATE * (1.0 - current), 4)
+    memory.access_count += 1
+    memory.last_accessed_at = now
+
+
 def _persona_text() -> str:
     path = PROMPTS_DIR / "sandrone_persona.md"
     if path.exists():
@@ -107,7 +134,7 @@ def _memory_to_dict(m: SemanticMemory) -> dict[str, Any]:
         "confidence": m.confidence,
         "importance": m.importance,
         "valence": m.valence,
-        "strength": m.strength,
+        "strength": round(effective_strength(m), 4),  # 当前强度，不是锚点值
         "access_count": m.access_count,
         "last_accessed_at": m.last_accessed_at,
         "status": m.status,

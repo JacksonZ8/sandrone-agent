@@ -9,14 +9,16 @@ from typing import Any
 from sqlmodel import Session, select
 
 from ...database import engine
-from ...models import MemoryExtractionRun, MemoryLink, Message, SemanticMemory
+from ...models import MemoryExtractionRun, MemoryLink, Message, SemanticMemory, utcnow
 from ..games.scope import message_scope
 from ..llm_service import chat_completion
 from ..provider_service import get_config
-from .common import PERSPECTIVES, _persona_text, _token_similarity, estimate_valence
+from ..user_emotion import USER_EMOTIONS, parse_llm_emotion, record_user_emotion, rule_emotion
+from .common import PERSPECTIVES, _persona_text, _token_similarity, estimate_valence, reinforce_memory
 from .diary import maybe_write_diary
 from .embedding import LINK_COSINE, embed_texts, memory_vectors
 from .retrieval import retrieve_semantic_memories
+from .revision import finish_revision_turn, is_resurrection
 
 logger = logging.getLogger(__name__)
 
@@ -138,15 +140,15 @@ def _normalize_memory_type(value: str) -> str:
     return aliases.get(value, "fact" if value else "")
 
 
-def _parse_llm_memories(raw: str) -> list[dict[str, Any]]:
+def _load_llm_json(raw: str) -> Any:
     raw = (raw or "").strip()
     if not raw:
-        return []
+        return None
     fence = re.search(r"```(?:json)?\s*(.*?)```", raw, flags=re.S)
     if fence:
         raw = fence.group(1).strip()
     try:
-        data = json.loads(raw)
+        return json.loads(raw)
     except json.JSONDecodeError:
         start = raw.find("[")
         end = raw.rfind("]")
@@ -154,12 +156,33 @@ def _parse_llm_memories(raw: str) -> list[dict[str, Any]]:
             start = raw.find("{")
             end = raw.rfind("}")
         if start == -1 or end == -1 or end < start:
-            return []
-        raw = raw[start : end + 1]
+            return None
         try:
-            data = json.loads(raw)
+            return json.loads(raw[start : end + 1])
         except json.JSONDecodeError:
-            return []
+            return None
+
+
+def _parse_reaffirmed(raw: str, shown_ids: set[int]) -> set[int]:
+    """模型认定用户这一轮主动重提或确认的已有记忆编号；只认提示里给它看过的编号。"""
+    data = _load_llm_json(raw)
+    if not isinstance(data, dict) or not isinstance(data.get("reaffirmed"), list):
+        return set()
+    ids: set[int] = set()
+    for item in data["reaffirmed"][:20]:
+        try:
+            memory_id = int(str(item).lstrip("#"))
+        except (TypeError, ValueError):
+            continue
+        if memory_id in shown_ids:
+            ids.add(memory_id)
+    return ids
+
+
+def _parse_llm_memories(raw: str) -> list[dict[str, Any]]:
+    data = _load_llm_json(raw)
+    if data is None:
+        return []
 
     if isinstance(data, dict):
         data = data.get("memories", data if data.get("content") else [])
@@ -211,22 +234,43 @@ def _save_candidates(
     *,
     extraction_run: MemoryExtractionRun,
     scope: str = "",
+    reaffirmed_ids: set[int] | None = None,
 ) -> int:
+    """保存新记忆；用户这一轮主动重提的已有记忆只强化、不重复入库。"""
     existing = list(session.exec(select(SemanticMemory).where(SemanticMemory.status == "active")).all())
+    now = utcnow()
+    reinforced: set[int] = set()
+
+    def reinforce(memory: SemanticMemory) -> None:
+        # 一轮里同一条只强化一次（模型认定和字面重复可能指向同一条）
+        if memory.id is None or memory.id in reinforced:
+            return
+        reinforce_memory(memory, now)
+        session.add(memory)
+        reinforced.add(memory.id)
+
+    for old in existing:
+        if old.id in (reaffirmed_ids or ()):
+            reinforce(old)
     # 有本地向量模型时，意思相近（不只是字面相近）的旧记忆也连联想边；去重仍只看字面，免得把“喜欢/不喜欢”当成重复
     vectors = memory_vectors(session, existing) if candidates else None
     saved = 0
     for candidate in candidates:
+        if is_resurrection(session, candidate["content"], source_ids):
+            continue  # 用户已经要求忘掉/改正，旧材料不能把它带回来
         similarities: list[tuple[float, SemanticMemory]] = []
-        dup = False
+        dup: SemanticMemory | None = None
         for old in existing:
             similarity = _token_similarity(candidate["content"], old.content)
             if similarity >= 0.72:
-                dup = True
+                dup = old
                 break
             if similarity >= 0.32 and old.id is not None:
                 similarities.append((similarity, old))
-        if dup:
+        if dup is not None:
+            # 用户又说了一遍已有的事：强化它；桑多涅自己视角的重复不是用户重提，不算
+            if candidate.get("perspective", "user") != "self":
+                reinforce(dup)
             continue
         fresh = embed_texts([candidate["content"]]) if vectors else None
         if fresh is not None:
@@ -268,7 +312,7 @@ def _save_candidates(
         existing.append(memory)
         saved += 1
 
-    if saved:
+    if saved or reinforced:
         session.commit()
     extraction_run.status = "success" if candidates else "success_empty"
     return saved
@@ -295,9 +339,13 @@ def run_extraction_background(user_message_id: int, assistant_message_id: int) -
         session.refresh(run)
 
         candidates: list[dict[str, Any]] = []
-        fallback = _heuristic_candidates(user_message.content)
+        reaffirmed: set[int] = set()
+        user_emotion: dict[str, Any] | None = None
+        # 这一轮是在要她忘掉或改正什么：不从这轮里提取，免得把要忘的又记回来
+        revision_turn = finish_revision_turn(session, user_message, assistant_message)
+        fallback = [] if revision_turn else _heuristic_candidates(user_message.content)
 
-        if _is_extraction_worthwhile(user_message.content):
+        if _is_extraction_worthwhile(user_message.content) and not revision_turn:
             try:
                 config = get_config(session)
                 run.provider = config.provider
@@ -310,10 +358,9 @@ def run_extraction_background(user_message_id: int, assistant_message_id: int) -
                         session,
                         user_message.content,
                         limit=8,
-                        touch=False,
                     )
                     existing_block = "\n".join(
-                        f"- [{m.perspective}][{m.type}] {m.content}" for m in existing_memories
+                        f"- #{m.id} [{m.perspective}][{m.type}] {m.content}" for m in existing_memories
                     )
                     system_prompt = (
                         _persona_text()
@@ -325,9 +372,14 @@ def run_extraction_background(user_message_id: int, assistant_message_id: int) -
                         "3) perspective=shared：关于「我们」的关系与共同约定；用「我们」写。\n"
                         "忽略寒暄和临时情绪。importance 表示对未来对话的重要程度（0-1），"
                         "confidence 表示证据是否明确（0-1），valence 表示该记忆的情感正负（-1 到 1）。"
-                        "已有记忆如下，避免重复提取：\n" + (existing_block or "（暂无）") + "\n\n"
+                        "已有记忆如下，避免重复提取：\n" + (existing_block or "（暂无）") + "\n"
+                        "如果用户这一轮自己主动重提或明确确认了某条已有记忆，把它的编号放进 reaffirmed；"
+                        "只是话题相关、或只是桑多涅提起的都不算，没有就给空列表。\n"
+                        "另外判断用户这一轮的情绪，只看用户自己的话和语境，不看桑多涅的态度："
+                        f"user_emotion 的 label 只能从 {'、'.join(USER_EMOTIONS)} 中选，confidence 表示有多确定（0-1）；"
+                        "看不出来就给 null，不要猜。\n\n"
                         "只输出 JSON，格式："
-                        '{"memories":[{"perspective":"self","type":"preference","content":"我其实不讨厌……","importance":0.7,"confidence":0.7,"valence":0.2}]}'
+                        '{"memories":[{"perspective":"self","type":"preference","content":"我其实不讨厌……","importance":0.7,"confidence":0.7,"valence":0.2}],"reaffirmed":[12],"user_emotion":{"label":"疲惫","confidence":0.7}}'
                     )
                     user_prompt = (
                         f"用户说：{user_message.content}\n"
@@ -347,9 +399,11 @@ def run_extraction_background(user_message_id: int, assistant_message_id: int) -
                         )
                     )
                     llm_candidates = _parse_llm_memories(result["text"])
+                    user_emotion = parse_llm_emotion(_load_llm_json(result["text"]))
+                    reaffirmed = _parse_reaffirmed(result["text"], {m.id for m in existing_memories if m.id is not None})
                     if llm_candidates:
                         candidates.extend(llm_candidates)
-                    else:
+                    elif not reaffirmed:
                         run.status = "fallback"
                 else:
                     run.status = "fallback"
@@ -360,23 +414,26 @@ def run_extraction_background(user_message_id: int, assistant_message_id: int) -
                 session.add(run)
                 session.commit()
 
-        if not candidates and run.status != "failed":
+        if not candidates and not reaffirmed and run.status != "failed":
             candidates = fallback
             if candidates:
                 run.status = "fallback"
             elif not _is_extraction_worthwhile(user_message.content):
                 run.status = "skipped"
 
-        if candidates:
+        if candidates or reaffirmed:
             # 发生在某场游戏中、或只聊到一个游戏的记忆归到那个游戏
             scope = message_scope(session, user_message.content, user_message.created_at)
-            _save_candidates(session, candidates, source_ids, extraction_run=run, scope=scope)
+            _save_candidates(session, candidates, source_ids, extraction_run=run, scope=scope, reaffirmed_ids=reaffirmed)
 
         run.candidates_json = json.dumps(candidates, ensure_ascii=False)
         if run.status in ("pending", "skipped", "success_empty"):
-            run.status = "skipped" if not candidates else run.status
+            run.status = "skipped" if not candidates and not reaffirmed else run.status
         session.add(run)
         session.commit()
+
+        # 对方这一轮的情绪：优先用上面那次模型调用顺带给的判断，没有就按明显用词粗判
+        record_user_emotion(session, user_message, user_emotion or rule_emotion(user_message.content))
 
         turn_index = user_message.turn_index
         maybe_write_diary(session, turn_index)

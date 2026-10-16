@@ -68,9 +68,9 @@ class SemanticMemory(SQLModel, table=True):
     confidence: float = Field(default=0.5)
     importance: float = Field(default=0.5)
     valence: float = Field(default=0.0)             # -1 消极 … +1 积极
-    strength: float = Field(default=1.0)
-    access_count: int = Field(default=0)
-    last_accessed_at: datetime | None = Field(default=None)
+    strength: float = Field(default=1.0)            # 上次巩固时的强度锚点，当前强度见 effective_strength
+    access_count: int = Field(default=0)            # 被用户主动重提、确认的次数（只是被检索到不算）
+    last_accessed_at: datetime | None = Field(default=None)  # 上次被用户重提的时间，即衰减锚点
     status: str = Field(default="active", index=True)
     notes: str = Field(default="")
     scope: str = Field(default="", index=True)  # "" 通用；"game:<id>" 只属于某个游戏
@@ -99,6 +99,17 @@ class MemoryLink(SQLModel, table=True):
     target_id: int = Field(index=True)
     relation: str = Field(default="related")
     weight: float = Field(default=1.0)
+    created_at: datetime = Field(default_factory=utcnow)
+
+
+class MemoryRedaction(SQLModel, table=True):
+    """用户要求忘掉或纠正后，不再被当作旧对话片段想起的消息。时间线里原文照旧，只是不再参与回忆。"""
+
+    __tablename__ = "memory_redactions"
+
+    id: int | None = Field(default=None, primary_key=True)
+    message_id: int = Field(index=True, unique=True)
+    reason: str = Field(default="")
     created_at: datetime = Field(default_factory=utcnow)
 
 
@@ -251,6 +262,33 @@ class ToolConfig(SQLModel, table=True):
     agent_max_output_chars: int = Field(default=12000)
     agent_max_budget_usd: float = Field(default=5.0)
     updated_at: datetime = Field(default_factory=utcnow)
+
+
+class AgentTask(SQLModel, table=True):
+    """委托给本地 CLI 子代理的一项任务：任务卡 -> 用户确认 -> 后台执行 -> 回执与通知。"""
+
+    __tablename__ = "agent_tasks"
+
+    id: int | None = Field(default=None, primary_key=True)
+    title: str
+    prompt: str                                      # 交给子代理的完整任务
+    spoken_summary: str = Field(default="")          # 一句口语摘要：语音确认与完成通知用
+    command: str                                     # claude / codex
+    permission: str = Field(default="readonly")      # readonly / write
+    cwd: str
+    # proposed 待确认 / running 执行中 / completed / failed / cancelled / expired / interrupted
+    status: str = Field(default="proposed", index=True)
+    parent_id: int | None = Field(default=None)      # 续接的上一个任务
+    agent_session_id: str = Field(default="")        # codex thread_id / claude session_id，续接用
+    target: str = Field(default="")                  # "" 她自己开的会话；codex_app 接着用户在 Codex App 里的线程
+    target_title: str = Field(default="")            # codex_app 线程的标题
+    channel: str = Field(default="web")              # 发起渠道，决定完成后怎样通知
+    output: str = Field(default="")
+    error: str = Field(default="")
+    duration_ms: int = Field(default=0)
+    created_at: datetime = Field(default_factory=utcnow, index=True)
+    confirmed_at: datetime | None = Field(default=None)
+    finished_at: datetime | None = Field(default=None)
 
 
 class ProactiveConfig(SQLModel, table=True):

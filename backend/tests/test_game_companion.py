@@ -263,12 +263,12 @@ class GameModeTests(unittest.TestCase):
             self.assertEqual(message_scope(session, "这把好难", self.now), game_scope(self.game_id))
             session.add(SemanticMemory(perspective="user", type="preference", content="他喜欢走力量流", importance=0.6, scope=game_scope(self.game_id)))
             session.commit()
-            inside = retrieve_semantic_memories_scored(session, "力量流", touch=False, scopes={game_scope(self.game_id)})
-            outside = retrieve_semantic_memories_scored(session, "力量流", touch=False, scopes=set())
+            inside = retrieve_semantic_memories_scored(session, "力量流", scopes={game_scope(self.game_id)})
+            outside = retrieve_semantic_memories_scored(session, "力量流", scopes=set())
             self.assertGreater(inside[0][0], outside[0][0] + 0.1)
-            unrelated = retrieve_semantic_memories_scored(session, "今天有点累晚饭吃什么", touch=False, scopes=set())
+            unrelated = retrieve_semantic_memories_scored(session, "今天有点累晚饭吃什么", scopes=set())
             self.assertEqual(unrelated, [])
-            playing = retrieve_semantic_memories_scored(session, "今天有点累晚饭吃什么", touch=False, scopes={game_scope(self.game_id)})
+            playing = retrieve_semantic_memories_scored(session, "今天有点累晚饭吃什么", scopes={game_scope(self.game_id)})
             self.assertEqual(len(playing), 1)  # 正在玩这个游戏时，即使话题不相关也记得
 
     def test_mentioning_a_game_brings_its_save_card(self) -> None:

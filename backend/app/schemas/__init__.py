@@ -64,8 +64,10 @@ from .tools import (
     AgentToolConfigUpdate,
     AgentRunRequest,
     AgentRunResponse,
-    AgentApprovalRequest,
-    AgentApprovalResponse,
+    AgentTaskPublic,
+    AgentTaskActionResponse,
+    CodexThreadPublic,
+    AgentTaskThreadUpdate,
 )
 from .state import (
     AppState,

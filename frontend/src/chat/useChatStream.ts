@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
-import { api, streamChat, streamRegenerate, type ChatOptions, type ChatStreamEvent } from "../api";
-import type { Message, ToolCallTrace } from "../types";
+import { streamChat, streamRegenerate, type ChatOptions, type ChatStreamEvent } from "../api";
+import type { AgentTask, Message, ToolCallTrace } from "../types";
 
 export interface LiveEvent {
   id: number;
@@ -13,33 +13,26 @@ export interface LiveEvent {
   done?: boolean;
 }
 
-export interface PendingApproval {
-  requestId: string;
-  name: string;
-  arguments: Record<string, unknown>;
-  timeoutSeconds: number;
-}
-
 interface Handlers {
   onMessages: (messages: Message[]) => void;
   onReply: (assistant: Message) => void;
   /** 重新生成成功后，旧回复的 id */
   onReplaced: (messageId: number) => void;
   onDone: () => void;
+  /** 她给出或处理了一张子代理任务卡 */
+  onTask: (task: AgentTask) => void;
 }
 
 type Starter = (onEvent: (event: ChatStreamEvent) => void) => Promise<void>;
 
-/** 一轮流式对话的进行中状态：思考/工具事件、写入确认与错误。 */
-export function useChatStream({ onMessages, onReply, onReplaced, onDone }: Handlers) {
+/** 一轮流式对话的进行中状态：思考/工具事件、任务卡与错误。 */
+export function useChatStream({ onMessages, onReply, onReplaced, onDone, onTask }: Handlers) {
   const [sending, setSending] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState<number | null>(null);
   const [startedAt, setStartedAt] = useState(0);
   const [events, setEvents] = useState<LiveEvent[]>([]);
   // 正在生成的回复正文：后端逐段推送，先显示出来，最终消息到达后由时间线里的正式消息替换
   const [partial, setPartial] = useState("");
-  const [approval, setApproval] = useState<PendingApproval | null>(null);
-  const [approvalBusy, setApprovalBusy] = useState(false);
   const [error, setError] = useState("");
 
   const run = useCallback(
@@ -50,7 +43,6 @@ export function useChatStream({ onMessages, onReply, onReplaced, onDone }: Handl
       setError("");
       setEvents([]);
       setPartial("");
-      setApproval(null);
       let nextId = 0;
       const push = (event: Omit<LiveEvent, "id">) => {
         nextId += 1;
@@ -72,17 +64,8 @@ export function useChatStream({ onMessages, onReply, onReplaced, onDone }: Handl
           } else if (raw.type === "tool_call") {
             const args = (raw.arguments as Record<string, unknown>) || {};
             push({ kind: "tool", name: String(raw.name || ""), arguments: args, done: false });
-            if (raw.requires_confirmation && raw.request_id) {
-              setApproval({
-                requestId: String(raw.request_id),
-                name: String(raw.name || ""),
-                arguments: args,
-                timeoutSeconds: Number(raw.confirmation_timeout_seconds || 180),
-              });
-              setApprovalBusy(false);
-            }
-          } else if (raw.type === "approval_result") {
-            setApproval(null);
+          } else if (raw.type === "agent_task" && raw.task) {
+            onTask(raw.task as AgentTask);
           } else if (raw.type === "tool_result") {
             setEvents((current) => {
               let index = current.length - 1;
@@ -126,13 +109,11 @@ export function useChatStream({ onMessages, onReply, onReplaced, onDone }: Handl
         setRegeneratingId(null);
         setEvents([]);
         setPartial("");
-        setApproval(null);
-        setApprovalBusy(false);
         onDone();
       }
       return restoreDraft;
     },
-    [onDone, onMessages, onReplaced, onReply],
+    [onDone, onMessages, onReplaced, onReply, onTask],
   );
 
   const send = useCallback(
@@ -149,38 +130,15 @@ export function useChatStream({ onMessages, onReply, onReplaced, onDone }: Handl
     [run],
   );
 
-  const answerApproval = useCallback(
-    async (approved: boolean) => {
-      if (!approval || approvalBusy) return;
-      setApprovalBusy(true);
-      try {
-        const result = await api.approveAgentTool(approval.requestId, approved);
-        if (!result.ok) {
-          setError(result.message || "写入确认已失效。");
-          setApproval(null);
-        }
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : String(caught));
-        setApproval(null);
-      } finally {
-        setApprovalBusy(false);
-      }
-    },
-    [approval, approvalBusy],
-  );
-
   return {
     sending,
     regeneratingId,
     startedAt,
     events,
     partial,
-    approval,
-    approvalBusy,
     error,
     setError,
     send,
     regenerate,
-    answerApproval,
   };
 }

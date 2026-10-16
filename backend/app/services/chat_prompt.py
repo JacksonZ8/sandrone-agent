@@ -9,10 +9,12 @@ from typing import Any
 from sqlmodel import Session
 
 from ..config import PROMPTS_DIR
+from .agent_tasks import agent_tasks_block
 from .games.play import game_context_block
 from .memory_service import build_memory_context_with_traces
 from .relationship_service import relationship_prompt_block
 from .screen_companion import screen_context_block
+from .user_emotion import user_emotion_block
 
 
 CHANNEL_HINTS = {
@@ -68,8 +70,10 @@ TOOL_PRINCIPLES = (
             "- 需要最新信息或外部资料：先 web_search 找来源，摘要不够时用 web_fetch 读具体网页；要读几个网页就在同一轮里一起调用（会并行执行）；回答里说出用到的来源，不要把没读过的网页当依据。\n"
             "- 只有用户明确要看当前屏幕、窗口、界面或视觉内容：才使用 look_at_screen。\n"
             "- 只有任务涉及整个项目、多个文件交叉分析或复杂推理、单次 read_file 不够时，才使用 delegate_agent；它较慢、会消耗额外额度。\n"
-            "- delegate_agent 的权限由用户在设置中决定：只读模式只能看，写入模式可以改授权目录内的文件；写入模式调用后网页会弹出确认，等用户决定即可。\n"
-            "- 无论哪种模式，都要在最终回复里说明子代理实际做了什么。"
+            "- delegate_agent 只生成任务卡：用户确认后才在后台执行，做完会另行通知。调用后请用户确认，不要说已经在做或已经做完。\n"
+            "- 用户问子代理任务的进度或结果时，按“子代理任务”里的记录回答；要接着某个任务做就填 continue_task_id。\n"
+            "- 只有用户明确要接着他在 Codex App 里的某个线程做时，才填 codex_thread。\n"
+            "- 用户明确要你忘掉某件事时用 forget_memory；指出你记错了时用 correct_memory。做完简短确认，不要复述要忘掉的细节。"
 )
 
 
@@ -85,8 +89,8 @@ def build_prompt_parts(
     stamp = now.strftime("%Y年%m月%d日 %H:%M")
     weekday = "一二三四五六日"[now.weekday()]
     static = "\n\n".join((_persona_text(), TOOL_PRINCIPLES))
-    parts = [f"现在是 {stamp}，星期{weekday}。", relationship_prompt_block(session)]
-    for block in (screen_context_block(session), game_context_block(session, query)):
+    parts = [f"现在是 {stamp}，星期{weekday}。", relationship_prompt_block(session), user_emotion_block(session)]
+    for block in (screen_context_block(session), game_context_block(session, query), agent_tasks_block(session)):
         if block:
             parts.append(block)
     if extra_context:

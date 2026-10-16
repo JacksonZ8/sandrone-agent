@@ -51,7 +51,6 @@ class MemoryServiceCompatibilityTests(unittest.TestCase):
             scored = memory_service.retrieve_semantic_memories_scored(
                 session,
                 "机械研究",
-                touch=False,
             )
             self.assertEqual(scored[0][1].id, first.id)
 

@@ -14,8 +14,9 @@ from fastapi.staticfiles import StaticFiles
 from .config import APP_NAME, APP_VERSION, AUDIO_CACHE_DIR, CHARACTER_DIR, FRONTEND_DIST, LIVE2D_DIR
 from .database import init_db
 from .logging_setup import log_asyncio_exceptions, setup_logging
-from .routers import chat, companion, games, live2d, memories, proactive, providers, push, state, tools, tts, usage, voice, wechat
+from .routers import agent_tasks, chat, companion, games, live2d, memories, proactive, providers, push, state, tools, tts, usage, voice, wechat
 from .security import LocalRequestGuard
+from .services.agent_tasks import recover_interrupted_tasks, stop_running_tasks
 from .services.backup_service import DAILY_BACKUP
 from .services.memory.common import warm_up as warm_up_tokenizer
 from .services.memory.embedding import warm_up as warm_up_embedding
@@ -35,6 +36,7 @@ async def lifespan(app: FastAPI):
     setup_logging()
     log_asyncio_exceptions(asyncio.get_running_loop())
     init_db()
+    recover_interrupted_tasks()
     await startup_wechat()
     start_tts_api_background()
     start_asr_background()
@@ -44,6 +46,7 @@ async def lifespan(app: FastAPI):
     COMPANION.start()
     DAILY_BACKUP.start()
     yield
+    stop_running_tasks()
     await DAILY_BACKUP.stop()
     await COMPANION.stop()
     await PROACTIVE_SCHEDULER.stop()
@@ -71,6 +74,7 @@ app.include_router(chat.router)
 app.include_router(memories.router)
 app.include_router(state.router)
 app.include_router(tools.router)
+app.include_router(agent_tasks.router)
 app.include_router(tts.router)
 app.include_router(wechat.router)
 app.include_router(proactive.router)
