@@ -297,7 +297,7 @@ export default function HerScreen({ appState, navigate }: Props) {
           [
             ["wallpaper", "壁纸与玻璃"],
             ["memory", "她记得的事"],
-            ["games", "陪你玩游戏"],
+            ["games", "游戏"],
             ["settings", "模型、微信与工具"],
             ["usage", "API 用量"],
           ] as const

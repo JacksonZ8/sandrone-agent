@@ -117,6 +117,7 @@ def game_public(game: GameProfile) -> dict[str, Any]:
         "recap_enabled": game.recap_enabled,
         "save_card": load_save_card(game),
         "knowledge_file": game.knowledge_file,
+        "auto_detected": game.auto_detected,
         "created_at": as_utc(game.created_at),
         "updated_at": as_utc(game.updated_at),
     }

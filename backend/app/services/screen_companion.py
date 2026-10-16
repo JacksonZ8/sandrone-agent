@@ -1,8 +1,10 @@
-"""陪你用电脑（M14）：只读、低频地看名单内应用的窗口，多数时候安静，偶尔说一句。
+"""看屏 · 陪着看（原“陪你用电脑”M14 与“陪你玩游戏”M15 的观察循环）：只读、低频地看窗口，多数时候安静，偶尔说一句。
 
-每隔几分钟检查一次：前台应用在名单里、人没有离开、窗口内容确实变了，才截这一个窗口交给视觉模型概括；
-概括（不含截图）存 7 天，进入她和你对话时的上下文。是否开口由她按人设决定，并受开口间隔限制。
-截图只在内存里，不落盘；首次开启需要用户在设置页同意截图外发给视觉模型。不做任何键鼠操作。
+两种开法：设置里常开（看名单内的应用和建过档的游戏），或语音说“这局陪我看着”临时开一段时间
+（watch_screen，只看开始时前台的应用，到点自动结束）。两种都需要用户先在设置里同意截图外发。
+每隔几分钟检查一次：前台应用在看的范围里、人没有离开、窗口内容确实变了，才截这一个窗口交给视觉模型概括；
+概括（不含截图）存 7 天，进入她和你对话时的上下文。前台是游戏时按游戏场景处理（见 games/play.py），
+没建过档的游戏被认出时自动加进游戏资料。截图只在内存里，不落盘。不做任何键鼠操作。
 """
 
 from __future__ import annotations
@@ -51,18 +53,21 @@ RECENT_CHAT_MINUTES = 10  # 刚聊过就不另外开口，看到的内容照样�
 RETENTION_DAYS = 7
 CONTEXT_MINUTES = 30
 MAX_REMARK_CHARS = 120
+WATCH_DEFAULT_MINUTES = 60
+WATCH_MAX_MINUTES = 240
 
 VISION_PROMPT = (
     "你在帮一个陪伴角色了解用户此刻在电脑上做什么。图里是用户正在用的一个应用窗口（{app}）。\n"
     "只输出 JSON："
     '{{"summary": "不超过 30 字，他在做什么，例如：在 VS Code 里改 Python 测试", '
     '"detail": "不超过 80 字，值得留意的地方，如报错、卡住的迹象、进度；没有就留空", '
-    '"notable": true 或 false（有报错、明显卡住、完成了什么等值得关心的事才为 true）}}\n'
+    '"notable": true 或 false（有报错、明显卡住、完成了什么等值得关心的事才为 true）, '
+    '"game": "如果这是一款电子游戏正在运行的游戏画面，写游戏名；否则空字符串"}}\n'
     "不要转录聊天内容、邮件正文、密码、证件号、银行卡号等私密信息原文，只做概括。"
 )
 
 COMPANION_INSTRUCTIONS = (
-    "## 陪他用电脑\n"
+    "## 陪他看着屏幕\n"
     "上面“你最近看到他在电脑上做的事”里最后一条是你刚看到的。"
     "现在由你决定要不要开口说一句。多数时候安静陪着就好，不要实况解说他在做什么。\n"
     "- 值得开口的时候：看到报错或他明显卡住了、同一件事做了很久、完成了什么、太晚了还在忙。\n"
@@ -110,6 +115,63 @@ def _as_utc(value: datetime | None) -> datetime | None:
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
+def watch_active(config: ScreenCompanionConfig, now: datetime | None = None) -> bool:
+    """语音临时开的“陪着看”还没到点。"""
+    until = _as_utc(config.watch_until)
+    return until is not None and until > (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+
+
+def watching_now(config: ScreenCompanionConfig, now: datetime | None = None) -> bool:
+    """她现在是否在陪着看（常开或临时开），且用户同意过截图外发。"""
+    return config.consent_at is not None and (config.enabled or watch_active(config, now))
+
+
+def start_watch(session: Session, minutes: int | None = None, *, desktop: MacDesktop | Any = MAC_DESKTOP) -> dict[str, Any]:
+    """watch_screen(start)：从现在起陪着看前台的应用一段时间。"""
+    config = get_companion_config(session)
+    if not get_tool_config(session).screen_enabled:
+        return {"ok": False, "error": "看屏没有开启，需要先在设置的“看屏”里打开。"}
+    if config.consent_at is None:
+        return {
+            "ok": False,
+            "error": "一直看着需要用户先在设置“看屏 · 陪着看”里勾选同意截图外发；只是看一眼不需要。请如实告诉用户。",
+        }
+    app = desktop.snapshot().app
+    if not app:
+        return {"ok": False, "error": "没读到前台是哪个应用，没有开始。"}
+    minutes = max(5, min(int(minutes or WATCH_DEFAULT_MINUTES), WATCH_MAX_MINUTES))
+    now = utcnow()
+    config.watch_until = now + timedelta(minutes=minutes)
+    config.watch_apps = json.dumps([app], ensure_ascii=False)
+    config.paused_until = None  # 用户刚说要看，之前的暂停作废
+    config.updated_at = now
+    session.add(config)
+    session.commit()
+    COMPANION.last_capture_at = None
+    until = _local_hhmm(config.watch_until)
+    return {
+        "ok": True,
+        "app": app,
+        "until": until,
+        "message": f"开始陪着看 {app}，到 {until} 自动结束；多数时候安静，用户说“别看了”可以提前停。",
+    }
+
+
+def stop_watch(session: Session) -> dict[str, Any]:
+    """watch_screen(stop)：结束语音临时开的陪着看。设置里的常开不受影响。"""
+    config = get_companion_config(session)
+    was_watching = watch_active(config)
+    config.watch_until = None
+    config.watch_apps = "[]"
+    config.updated_at = utcnow()
+    session.add(config)
+    session.commit()
+    message = "已经不看了。" if was_watching else "本来就没有在临时陪着看。"
+    if config.enabled:
+        message += "设置里的常开陪着看还开着，要关得去设置。"
+    return {"ok": True, "message": message}
+
+
 def companion_config_public(session: Session, config: ScreenCompanionConfig) -> dict[str, Any]:
     tool_config = get_tool_config(session)
     base_url, model, api_key = vision_settings(session, tool_config)
@@ -121,6 +183,8 @@ def companion_config_public(session: Session, config: ScreenCompanionConfig) -> 
         "notify": config.notify,
         "consented": config.consent_at is not None,
         "paused_until": _as_utc(config.paused_until),
+        "watch_until": _as_utc(config.watch_until) if watch_active(config) else None,
+        "watch_apps": _app_list(config.watch_apps) if watch_active(config) else [],
         "vision_base_url": base_url,
         "vision_model": model,
         "has_vision_key": bool(api_key),
@@ -142,6 +206,9 @@ def update_companion_config(session: Session, data: dict[str, Any]) -> ScreenCom
             setattr(config, name, data[name])
     if "paused_until" in data:
         config.paused_until = data["paused_until"]
+    if data.get("stop_watch") is True:
+        config.watch_until = None
+        config.watch_apps = "[]"
     config.updated_at = utcnow()
     session.add(config)
     session.commit()
@@ -202,7 +269,7 @@ def _observation_lines(rows: list[ScreenObservation]) -> str:
 def screen_context_block(session: Session, now: datetime | None = None) -> str:
     """对话时给她的上下文：开着陪伴模式且最近半小时看到过什么时，告诉她看到了什么。"""
     config = session.get(ScreenCompanionConfig, 1)
-    if config is None or not config.enabled:
+    if config is None or not watching_now(config, now):
         return ""
     cutoff = (now or datetime.now(timezone.utc)).astimezone(timezone.utc) - timedelta(minutes=CONTEXT_MINUTES)
     # 游戏里的观察由游戏上下文（存档卡、本场所见）单独给出
@@ -217,7 +284,7 @@ def screen_context_block(session: Session, now: datetime | None = None) -> str:
         return ""
     return (
         "## 你最近看到他在电脑上做的事\n"
-        "他开着“陪你用电脑”，你能看到名单内应用的窗口（只读）。需要时可以自然地提起，不必每次都提。\n"
+        "你在陪他看着屏幕，能看到他允许的应用窗口（只读）。需要时可以自然地提起，不必每次都提。\n"
         + _observation_lines(rows)
     )
 
@@ -241,6 +308,7 @@ class SeenWindow:
     summary: str
     detail: str
     notable: bool
+    game: str = ""  # 视觉模型认出的游戏名
 
 
 def parse_vision_reply(raw: str) -> SeenWindow | None:
@@ -251,7 +319,8 @@ def parse_vision_reply(raw: str) -> SeenWindow | None:
     summary = str(data.get("summary") or "").strip()
     if not summary:
         return None
-    return SeenWindow(summary[:60], str(data.get("detail") or "").strip()[:160], data.get("notable") is True)
+    game = str(data.get("game") or "").strip().strip("《》「」\"'")[:40]
+    return SeenWindow(summary[:60], str(data.get("detail") or "").strip()[:160], data.get("notable") is True, game)
 
 
 def parse_remark(raw: str) -> str:
@@ -403,13 +472,22 @@ class ScreenCompanion:
             # 离开游戏 15 分钟的场次先收尾（写战报），与是否开启、是否暂停无关
             await self._close_game_sessions(session, now)
             config = get_companion_config(session)
-            if not config.enabled or config.consent_at is None:
+            if config.watch_until is not None and not watch_active(config, now):
+                # 语音开的陪着看到点了
+                config.watch_until = None
+                config.watch_apps = "[]"
+                session.add(config)
+                session.commit()
+            if not watching_now(config, now):
                 return self._set("off")
             paused = _as_utc(config.paused_until)
             if paused and paused > now.astimezone(timezone.utc):
                 return self._set("paused")
             games = {name: game for game in list_games(session) for name in game_app_names(game)}
-            apps = set(_app_list(config.allowed_apps)) | set(games)
+            # 常开：名单内的应用与建过档的游戏；临时开：只看开始时前台的那个应用
+            apps = (set(_app_list(config.allowed_apps)) | set(games)) if config.enabled else set()
+            if watch_active(config, now):
+                apps |= set(_app_list(config.watch_apps))
 
             snapshot = await asyncio.to_thread(self.desktop.snapshot)
             if force:
@@ -465,6 +543,11 @@ class ScreenCompanion:
                 return self._set("error", app, sanitize_error(str(exc), limit=200))
             if seen is None:
                 return self._set("watching", app)
+            if seen.game:
+                # 认出是游戏：自动加进游戏资料，下一次按游戏场景看
+                from .games.detect import adopt_detected_game
+
+                adopt_detected_game(session, seen.game, app)
             row = ScreenObservation(
                 created_at=now.astimezone(timezone.utc),
                 app=app,

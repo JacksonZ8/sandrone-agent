@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 from sqlmodel import Session
 
-from ...models import ToolConfig, utcnow
+from ...models import GameProfile, ToolConfig, utcnow
 from ..provider_service import get_config
 from .audit import _record_tool_call
 from .config import get_tool_config
@@ -174,21 +174,36 @@ def call_vision(
     return {"ok": True, "analysis": analysis, "message": "屏幕分析完成。"}
 
 
-def _capture_for_help(session: Session) -> tuple[bytes | None, str]:
-    """求助时的单次截图：设了“陪你用电脑”应用名单时只截名单内最前面的窗口，否则沿用整屏截图。"""
+def _capture_for_help(session: Session) -> tuple[bytes | None, str, str, GameProfile | None]:
+    """看一眼的单次截图，返回 (图片, 拒绝原因, 前台应用, 对上的游戏档案)。
+
+    前台是建过档的游戏时只截游戏窗口；否则设了“陪着看”应用名单时只截名单内最前面的窗口，再否则截整屏。
+    """
+    from ..games.profiles import game_for_app
     from ..screen_companion import allowed_apps
+
+    try:
+        snapshot = MAC_DESKTOP.snapshot()
+    except Exception:  # noqa: BLE001 - 读不到窗口信息时退回整屏截图
+        snapshot = None
+    app = snapshot.app if snapshot is not None else ""
+    game = game_for_app(session, app) if app else None
+    if game is not None and snapshot is not None:
+        window = snapshot.front_window()
+        if window is not None:
+            return MAC_DESKTOP.capture(window.id).jpeg, "", app, game
 
     apps = allowed_apps(session)
     if not apps:
         image_path = _capture_screen()
         try:
-            return image_path.read_bytes(), ""
+            return image_path.read_bytes(), "", app, None
         finally:
             image_path.unlink(missing_ok=True)
-    window = MAC_DESKTOP.snapshot().front_window(apps)
+    window = (snapshot or MAC_DESKTOP.snapshot()).front_window(apps)
     if window is None:
-        return None, "屏幕上没有允许她看的应用窗口。可以在设置的“陪你用电脑”里把应用加入名单。"
-    return MAC_DESKTOP.capture(window.id).jpeg, ""
+        return None, "屏幕上没有允许她看的应用窗口。可以在设置的“看屏 · 陪着看”里把应用加入名单。", app, None
+    return MAC_DESKTOP.capture(window.id).jpeg, "", window.app, None
 
 
 def _analyze_screen(
@@ -197,19 +212,35 @@ def _analyze_screen(
     config: ToolConfig,
 ) -> dict[str, Any]:
     if not config.screen_enabled:
-        return {"ok": False, "analysis": "", "message": "屏幕观察未开启。请先在设置里开启。"}
+        return {"ok": False, "analysis": "", "message": "看屏没有开启。请先在设置的“看屏 · 看一眼”里打开。"}
     if not vision_settings(session, config)[2]:
         return {"ok": False, "analysis": "", "message": "没有可用的视觉模型 API Key。可以在设置里填写，或留空复用聊天模型的 DeepSeek Key。"}
 
-    image_bytes, refusal = _capture_for_help(session)
+    from ..games.detect import adopt_detected_game, game_look_prompt, look_prompt, note_game_look, parse_look_reply
+
+    image_bytes, refusal, app, game = _capture_for_help(session)
     if image_bytes is None:
         return {"ok": False, "analysis": "", "message": refusal}
-    prompt = (
-        "你是桑多涅，正在看用户的电脑屏幕，目的是帮助用户处理当前工作。"
-        "请用简体中文简洁描述：屏幕上当前是什么应用/页面、用户在做什么、有哪些值得注意的问题。"
-        f"用户的问题：{question}"
-    )
-    return call_vision(session, config, prompt, image_bytes)
+    if game is not None:
+        # 正在玩建过档的游戏：带上账号档案和游戏知识回答
+        result = call_vision(session, config, game_look_prompt(game, question), image_bytes, max_tokens=1000)
+        if result["ok"]:
+            note_game_look(session, game, result["analysis"])
+            result["game"] = game.name
+        return result
+    result = call_vision(session, config, look_prompt(question), image_bytes, max_tokens=1000)
+    if not result["ok"]:
+        return result
+    answer, detected = parse_look_reply(result["analysis"])
+    result["analysis"] = answer
+    if detected:
+        # 认出了游戏：自动加进游戏资料，这一场算正在玩
+        game, added = adopt_detected_game(session, detected, app)
+        if game is not None:
+            note_game_look(session, game, answer)
+            result["game"] = game.name
+            result["game_added"] = added
+    return result
 
 
 def analyze_screen(session: Session, question: str = "看看我现在的屏幕，告诉我当前在做什么。") -> dict[str, Any]:

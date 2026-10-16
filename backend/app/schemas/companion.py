@@ -1,4 +1,4 @@
-"""陪你用电脑的接口契约（前端 types.ts 手工同步）。"""
+"""看屏 · 陪着看的接口契约（前端 types.ts 手工同步）。"""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ class CompanionConfigUpdate(BaseModel):
     interval_minutes: int | None = Field(default=None, ge=2, le=60)
     remark_gap_minutes: int | None = Field(default=None, ge=0, le=600)
     notify: bool | None = None
+    stop_watch: bool | None = None  # 结束语音临时开的陪着看
 
 
 class CompanionConfigPublic(BaseModel):
@@ -24,6 +25,8 @@ class CompanionConfigPublic(BaseModel):
     notify: bool
     consented: bool
     paused_until: datetime | None
+    watch_until: datetime | None = None  # 语音临时开的陪着看到几点
+    watch_apps: list[str] = []
     vision_base_url: str
     vision_model: str
     has_vision_key: bool

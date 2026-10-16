@@ -10,7 +10,7 @@ const TITLES: Record<Route, string> = {
   chat: "SANDRONE",
   her: "她的资料",
   memory: "她记得的事",
-  games: "陪你玩游戏",
+  games: "游戏",
   wallpaper: "壁纸与玻璃",
   settings: "模型、微信与工具",
   usage: "API 用量",
@@ -20,7 +20,7 @@ const NAV: { route: Route; label: string }[] = [
   { route: "chat", label: "对话" },
   { route: "her", label: "她的资料" },
   { route: "memory", label: "她记得的事" },
-  { route: "games", label: "陪你玩游戏" },
+  { route: "games", label: "游戏" },
   { route: "wallpaper", label: "壁纸与玻璃" },
   { route: "settings", label: "模型、微信与工具" },
   { route: "usage", label: "API 用量" },
@@ -33,7 +33,7 @@ interface Props {
   children: ReactNode;
 }
 
-/** “陪你用电脑”正在看时返回标题下的常驻提示（陪你用 X / 陪你玩 X），随时知道她能看到什么。 */
+/** 她在“陪着看”时返回标题下的常驻提示（在看 X / 在看你玩 X），随时知道她能看到什么。 */
 function useWatchingApp(active: boolean): string {
   const [app, setApp] = useState("");
   useEffect(() => {
@@ -45,9 +45,9 @@ function useWatchingApp(active: boolean): string {
         if (!cancelled)
           setApp(
             status.state === "watching"
-              ? `陪你用 ${status.app}`
+              ? `在看 ${status.app}`
               : status.state === "playing"
-                ? `陪你玩 ${status.app}`
+                ? `在看你玩 ${status.app}`
                 : "",
           );
       } catch {

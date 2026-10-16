@@ -55,6 +55,7 @@ class GamePublic(BaseModel):
     recap_enabled: bool
     save_card: GameSaveCard
     knowledge_file: str
+    auto_detected: bool = False
     created_at: datetime
     updated_at: datetime
 

@@ -223,7 +223,7 @@ class CompanionTests(unittest.TestCase):
         self.assertEqual(self._rows()[0].message_id, message.id)
         self.assertEqual(self.desktop.notes, ["第 12 行减号写反了吧。"])
         system = llm.await_args.args[2][0]["content"]
-        self.assertIn("陪他用电脑", system)
+        self.assertIn("陪他看着屏幕", system)
         self.assertIn("AssertionError", system)
         self.assertEqual(llm.await_args.kwargs["purpose"], "screen_companion")
 
@@ -299,11 +299,11 @@ class HelpScreenshotTests(unittest.TestCase):
                 return screen_tool._capture_for_help(session)
 
     def test_listed_window_only(self) -> None:
-        image, refusal = self._capture('["Code"]')
-        self.assertEqual((image, refusal, self.desktop.captured), (b"jpeg", "", [11]))
+        image, refusal, app, game = self._capture('["Code"]')
+        self.assertEqual((image, refusal, app, game, self.desktop.captured), (b"jpeg", "", "Code", None, [11]))
 
     def test_refuses_without_listed_window(self) -> None:
-        image, refusal = self._capture('["WeChat"]')
+        image, refusal, _, _ = self._capture('["WeChat"]')
         self.assertIsNone(image)
         self.assertIn("名单", refusal)
         self.assertEqual(self.desktop.captured, [])

@@ -332,7 +332,7 @@ class PushSubscription(SQLModel, table=True):
 
 
 class ScreenCompanionConfig(SQLModel, table=True):
-    """“陪你用电脑”：只读、低频地看名单内应用的窗口。默认关闭，首次开启需用户同意截图外发。"""
+    """看屏 · 陪着看：只读、低频地看名单内应用的窗口。常开默认关闭；也可以语音临时开一段时间。首次需用户同意截图外发。"""
 
     __tablename__ = "screen_companion_config"
 
@@ -344,6 +344,9 @@ class ScreenCompanionConfig(SQLModel, table=True):
     notify: bool = Field(default=True)  # 开口时同时弹系统通知
     consent_at: datetime | None = Field(default=None)
     paused_until: datetime | None = Field(default=None)
+    # 语音临时开的“陪着看”：到这个时间自动结束，只看开始时前台的应用
+    watch_until: datetime | None = Field(default=None)
+    watch_apps: str = Field(default="[]")
     updated_at: datetime = Field(default_factory=utcnow)
 
 
@@ -382,6 +385,7 @@ class GameProfile(SQLModel, table=True):
     recap_enabled: bool = Field(default=True)
     save_card: str = Field(default="{}")  # 账号档案 JSON：progress / roster / build / resources / goals / struggles / preferences / notes
     knowledge_file: str = Field(default="")  # knowledge/games/ 下的文件名，可分享
+    auto_detected: bool = Field(default=False)  # 看屏时自动认出、自动加的（默认不写战报）
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 

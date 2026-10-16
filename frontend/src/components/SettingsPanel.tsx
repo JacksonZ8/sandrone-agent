@@ -24,8 +24,9 @@ export default function SettingsPanel({ onConfigSaved }: Props) {
       <WeChatSettingsCard onConfigSaved={onConfigSaved} />
       <ProactiveSettingsCard />
       <FileSearchSettingsCard />
-      <CompanionSettingsCard />
+      {/* 看屏：看一眼在前，陪着看紧跟其后 */}
       <ScreenSettingsCard />
+      <CompanionSettingsCard />
       <AgentSettingsCard />
       <TTSStatusCard />
     </div>

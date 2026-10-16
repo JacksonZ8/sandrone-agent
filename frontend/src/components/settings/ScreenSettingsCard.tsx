@@ -38,7 +38,7 @@ export default function ScreenSettingsCard() {
       });
       setScreenTool(config);
       setVisionKeyInput("");
-      setNotice("屏幕观察配置已保存。");
+      setNotice("看屏配置已保存。");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     } finally {
@@ -48,7 +48,7 @@ export default function ScreenSettingsCard() {
 
   return (
     <div className="settings-card">
-      <h3>屏幕观察</h3>
+      <h3>看屏 · 看一眼</h3>
       {loading ? (
         <div className="chat-hint">正在读取屏幕设置…</div>
       ) : (
@@ -58,21 +58,34 @@ export default function ScreenSettingsCard() {
               <input
                 type="checkbox"
                 checked={screenTool?.screen_enabled ?? false}
-                onChange={(event) => setScreenTool(screenTool ? { ...screenTool, screen_enabled: event.target.checked } : null)}
+                onChange={(event) =>
+                  setScreenTool(
+                    screenTool ? { ...screenTool, screen_enabled: event.target.checked } : null,
+                  )
+                }
               />
-              允许桑多涅观察屏幕（只读）
+              允许她看屏幕（只读）
             </span>
           </label>
           <p className="chat-hint">
-            开启后，她判断需要时会截取整个屏幕（在“陪你用电脑”里设了应用名单时，只截名单内最前面的窗口），缩放后发送给下方视觉模型的服务地址；留空时使用对话模型的地址与 Key。截图分析后即删除，但发送前请留意屏幕上的私密内容。
+            开启后，你让她看时她才截图：前台是游戏时只截游戏窗口，设了“陪着看”应用名单时只截名单内最前面的窗口，否则截整个屏幕；缩放后发给下方视觉模型，留空时使用对话模型的地址与
+            Key。截图分析后即删除，但发送前请留意屏幕上的私密内容。认出没建档的游戏会自动加进“游戏”。
           </p>
           <label className="field">
             <span>视觉模型 Base URL（留空使用聊天 Base URL）</span>
-            <input value={visionBaseUrl} onChange={(event) => setVisionBaseUrl(event.target.value)} placeholder="https://api.deepseek.com" />
+            <input
+              value={visionBaseUrl}
+              onChange={(event) => setVisionBaseUrl(event.target.value)}
+              placeholder="https://api.deepseek.com"
+            />
           </label>
           <label className="field">
             <span>视觉模型名称（留空使用 deepseek-v4-flash-vision-exp）</span>
-            <input value={visionModel} onChange={(event) => setVisionModel(event.target.value)} placeholder="deepseek-v4-flash-vision-exp" />
+            <input
+              value={visionModel}
+              onChange={(event) => setVisionModel(event.target.value)}
+              placeholder="deepseek-v4-flash-vision-exp"
+            />
           </label>
           <label className="field">
             <span>视觉模型 API Key（留空复用聊天模型同一个 Key）</span>
@@ -80,7 +93,11 @@ export default function ScreenSettingsCard() {
               type="password"
               value={visionKeyInput}
               onChange={(event) => setVisionKeyInput(event.target.value)}
-              placeholder={screenTool?.has_vision_api_key ? `已保存 ${screenTool.vision_api_key_masked}` : "留空复用 DeepSeek Key"}
+              placeholder={
+                screenTool?.has_vision_api_key
+                  ? `已保存 ${screenTool.vision_api_key_masked}`
+                  : "留空复用 DeepSeek Key"
+              }
             />
           </label>
           <div className="settings-actions">
@@ -91,7 +108,9 @@ export default function ScreenSettingsCard() {
         </>
       )}
       {notice && <div className="success-banner">{notice}</div>}
-      <p className="tool-hint">聊天中可以说：看看我现在的屏幕。</p>
+      <p className="tool-hint">
+        聊天或通话中可以说：看看我的屏幕 / 这张牌该不该拿 / 讲讲屏幕上这道题。
+      </p>
     </div>
   );
 }

@@ -20,7 +20,7 @@ const EMPTY_DRAFT = {
   recap_enabled: true,
 };
 
-/** 陪你玩游戏（M15）：游戏档案、陪玩角色、账号档案与里程碑、可分享的游戏知识、战报与这个游戏的记忆。 */
+/** 游戏（看屏时自动识别的场景）：游戏档案、陪玩角色、账号档案与里程碑、可分享的游戏知识、战报与这个游戏的记忆。 */
 export default function GamesScreen({ navigate }: { navigate: (route: Route) => void }) {
   const [games, setGames] = useState<Game[] | null>(null);
   const [roles, setRoles] = useState<GameRole[]>([]);
@@ -92,17 +92,18 @@ export default function GamesScreen({ navigate }: { navigate: (route: Route) => 
     }
   }
 
-  const ready = companion?.enabled && companion.consented;
+  const ready = companion?.consented;
   const roleLabel = (id: GameRoleId) => roles.find((role) => role.id === id)?.label ?? id;
 
   return (
     <div className={styles.page}>
       <p className={styles.lead}>
-        你玩游戏时，她按你选的角色陪着：战斗里不出声，只在结算、阵亡、菜单这些间隙说话；玩完写战报，记住你每个游戏的进度和打法。
+        游戏是看屏时自动认出的场景：你让她看一眼时，她认出游戏就会带上这里的档案和知识回答，没见过的游戏会自动加进来。
+        让她一直陪着看时（设置里常开，或通话中说“这局陪我看着”），她按你选的角色陪着：战斗里不出声，只在间隙说话。
       </p>
       {companion && !ready && (
         <div className={`${ui.card} ${styles.notice}`}>
-          需要先在设置里开启「陪你用电脑」并同意截图外发，她才看得到游戏画面。
+          要她一直陪着看，需要先在设置「看屏 · 陪着看」里同意截图外发；只是让她看一眼不需要。
           <button type="button" className={ui.pill} onClick={() => navigate("settings")}>
             去设置
           </button>
@@ -129,6 +130,7 @@ export default function GamesScreen({ navigate }: { navigate: (route: Route) => 
           >
             <span className={styles.name}>{game.name}</span>
             <span className={ui.tagAccent}>{roleLabel(game.role)}</span>
+            {game.auto_detected && <span className={ui.tag}>自动识别</span>}
             <span className={styles.progress}>
               {game.save_card.progress || game.app_names.join("、")}
             </span>

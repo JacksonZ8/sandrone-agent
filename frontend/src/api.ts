@@ -235,7 +235,7 @@ export const api = {
         CompanionConfig,
         "enabled" | "allowed_apps" | "interval_minutes" | "remark_gap_minutes" | "notify"
       >
-    > & { consent?: boolean },
+    > & { consent?: boolean; stop_watch?: boolean },
   ) =>
     request<CompanionConfig>("/api/companion/config", {
       method: "PUT",

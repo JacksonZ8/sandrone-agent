@@ -102,13 +102,28 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "look_at_screen",
-            "description": "截取用户当前电脑屏幕（设了“陪你用电脑”应用名单时只截名单内最前面的窗口）并用视觉模型分析。仅在用户明确要求看当前屏幕、当前界面、窗口或视觉内容时使用。如果用户问的是桌面/目录里有哪些文件、文件内容，请优先使用 read_file。",
+            "description": "看一眼用户当前的电脑屏幕并回答他的问题（前台是游戏时只看游戏窗口，并带上这个游戏的档案和知识；认出没建档的游戏会自动加进游戏资料）。仅在用户明确要求看当前屏幕、界面、窗口或画面时使用。如果用户问的是桌面/目录里有哪些文件、文件内容，请优先使用 read_file。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "question": {"type": "string", "description": "关于屏幕内容的具体问题，可选"}
                 },
                 "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "watch_screen",
+            "description": "用户明确要你一直看着屏幕时（如“这局陪我看着”“接下来看着我写代码”）开始“陪着看”：每隔几分钟看一次前台那个应用，多数时候安静，到时间自动结束；用户说“别看了”时停止。偶尔问一句屏幕上的东西用 look_at_screen 就够了。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": ["start", "stop"], "description": "start 开始，stop 结束"},
+                    "minutes": {"type": "integer", "description": "看多久（分钟），默认 60，最多 240"},
+                },
+                "required": ["action"],
             },
         },
     },
@@ -180,7 +195,7 @@ def active_tool_schemas(config: ToolConfig) -> list[dict[str, Any]]:
     if config.files_enabled:
         names.add("read_file")
     if config.screen_enabled:
-        names.add("look_at_screen")
+        names.update(("look_at_screen", "watch_screen"))
     if config.agent_enabled:
         names.add("delegate_agent")
     return [schema for schema in TOOL_SCHEMAS if schema["function"]["name"] in names]
@@ -245,9 +260,21 @@ def execute_tool_call(session: Session, name: str, arguments: dict[str, Any], *,
     if name == "look_at_screen":
         question = str(arguments.get("question") or "看看我现在的屏幕，告诉我当前在做什么。").strip()
         result = analyze_screen(session, question)
-        if result["ok"]:
-            return {"ok": True, "analysis": result["analysis"]}
-        return {"ok": False, "error": result["message"]}
+        if not result["ok"]:
+            return {"ok": False, "error": result["message"]}
+        outcome: dict[str, Any] = {"ok": True, "analysis": result["analysis"]}
+        if result.get("game"):
+            outcome["game"] = result["game"]
+            if result.get("game_added"):
+                outcome["note"] = f"第一次认出《{result['game']}》，已自动加进游戏资料；以后看到它会带上档案和知识。可以顺口告诉用户。"
+        return outcome
+
+    if name == "watch_screen":
+        from ..screen_companion import start_watch, stop_watch
+
+        if str(arguments.get("action") or "start") == "stop":
+            return stop_watch(session)
+        return start_watch(session, arguments.get("minutes"))
 
     if name == "delegate_agent":
         from ..agent_tasks import propose_task

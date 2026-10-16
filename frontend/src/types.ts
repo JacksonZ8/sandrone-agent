@@ -366,6 +366,9 @@ export interface CompanionConfig {
   notify: boolean;
   consented: boolean;
   paused_until: string | null;
+  /** 语音临时开的“陪着看”到几点（没有在临时看时为 null） */
+  watch_until: string | null;
+  watch_apps: string[];
   vision_base_url: string;
   vision_model: string;
   has_vision_key: boolean;
@@ -421,6 +424,8 @@ export interface Game {
   recap_enabled: boolean;
   save_card: GameSaveCard;
   knowledge_file: string;
+  /** 看屏时自动认出、自动加的 */
+  auto_detected: boolean;
   created_at: string;
   updated_at: string;
 }

@@ -92,6 +92,11 @@ def _migrate_schema() -> None:
         ],
         "game_profiles": [
             ("knowledge_file", "TEXT NOT NULL DEFAULT ''"),
+            ("auto_detected", "BOOLEAN NOT NULL DEFAULT 0"),
+        ],
+        "screen_companion_config": [
+            ("watch_until", "DATETIME"),
+            ("watch_apps", "TEXT NOT NULL DEFAULT '[]'"),
         ],
         "screen_observations": [
             ("game_id", "INTEGER"),

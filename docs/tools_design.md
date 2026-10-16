@@ -32,16 +32,17 @@
 - `read_file`：只读读取本机文本/代码文件。
 - `web_search`：只返回标题、链接与摘要，可用 `allowed_domains` / `blocked_domains` 限定网站（DuckDuckGo / Brave / Tavily / Serper）。
 - `web_fetch`：读一个网页并只依据它回答给定问题。
-- `look_at_screen`：截取当前屏幕并用视觉模型分析。
+- `look_at_screen`：看屏 · 看一眼，截一次图用视觉模型回答；前台是游戏时只截游戏窗口并带上档案和知识，认出没建档的游戏会自动建档。
+- `watch_screen`：看屏 · 陪着看，用户明确要她一直看着时临时开（只看当前前台应用，默认 1 小时）或提前结束；需要先在设置里同意截图外发。
 - `delegate_agent`：派 Claude Code 或 Codex CLI 子代理做项目级分析与受控修改（M11 v2，权限由配置决定）。
 
-## 屏幕观察
+## 看屏 · 看一眼
 
 - 默认关闭，需要在设置页开启。
 - 使用 macOS `screencapture` 截屏，`sips` 缩放到最大 1280px。
 - 截图以 JPEG 发送给可配置的 OpenAI-compatible 视觉模型。
 - 默认视觉模型：`deepseek-v4-flash-vision-exp`；Base URL 和 API Key 留空时自动复用聊天模型的 DeepSeek 配置。
-- 截取的是整个屏幕而不是单个窗口；外发前不做裁剪，设置页已明确提示。
+- 前台是建过档的游戏时只截游戏窗口；设了陪着看名单时只截名单内最前面的窗口；否则截整个屏幕，外发前不做裁剪，设置页已明确提示。
 - 分析结束后立即删除截图，不留存。
 - 需要给终端/后端授予 macOS「屏幕录制」权限。
 

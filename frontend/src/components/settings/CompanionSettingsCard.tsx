@@ -29,7 +29,7 @@ function clock(iso: string | null): string {
 }
 
 function statusText(status: CompanionStatus | null, config: CompanionConfig): string {
-  if (!config.enabled) return STATE_LABELS.off;
+  if (!config.enabled && !config.watch_until) return STATE_LABELS.off;
   if (config.paused_until && new Date(config.paused_until) > new Date())
     return `已暂停到 ${clock(config.paused_until)}`;
   if (!status || !status.checked_at) return "等待第一次检查…";
@@ -39,7 +39,7 @@ function statusText(status: CompanionStatus | null, config: CompanionConfig): st
   return `${label}${app}${seen}${status.message ? ` · ${status.message}` : ""}`;
 }
 
-/** 陪你用电脑（M14）：只读、低频地看名单内应用的窗口，多数时候安静。 */
+/** 看屏 · 陪着看：只读、低频地看窗口，多数时候安静；可以常开，也可以语音临时开一段时间。 */
 export default function CompanionSettingsCard() {
   const [config, setConfig] = useState<CompanionConfig | null>(null);
   const [status, setStatus] = useState<CompanionStatus | null>(null);
@@ -92,23 +92,24 @@ export default function CompanionSettingsCard() {
   if (!config) {
     return (
       <div className="settings-card">
-        <h3>陪你用电脑</h3>
+        <h3>看屏 · 陪着看</h3>
         <div className="chat-hint">{notice || "正在读取设置…"}</div>
       </div>
     );
   }
 
-  const needsConsent = config.enabled && !config.consented;
+  const needsConsent = !config.consented;
+  const watching = Boolean(config.watch_until && new Date(config.watch_until) > new Date());
   const choices = running.filter((name) => !config.allowed_apps.includes(name));
   const paused = Boolean(config.paused_until && new Date(config.paused_until) > new Date());
 
   const save = () =>
     run(async () => {
-      if (needsConsent && !agree) throw new Error("开启前请先勾选同意。");
+      if (config.enabled && needsConsent && !agree) throw new Error("常开前请先勾选同意。");
       setConfig(
         await api.updateCompanionConfig({
           enabled: config.enabled,
-          consent: needsConsent ? true : undefined,
+          consent: needsConsent && agree ? true : undefined,
           allowed_apps: config.allowed_apps,
           interval_minutes: config.interval_minutes,
           remark_gap_minutes: config.remark_gap_minutes,
@@ -135,7 +136,7 @@ export default function CompanionSettingsCard() {
 
   return (
     <div className="settings-card">
-      <h3>陪你用电脑</h3>
+      <h3>看屏 · 陪着看</h3>
       <label className="field">
         <span className="inline-check">
           <input
@@ -143,19 +144,38 @@ export default function CompanionSettingsCard() {
             checked={config.enabled}
             onChange={(event) => setConfig({ ...config, enabled: event.target.checked })}
           />
-          让她陪你用电脑（只读）
+          常开：一直陪着看名单内的应用和建过档的游戏（只读）
         </span>
       </label>
       <p className="tool-hint">
-        {`每隔几分钟，如果你正在用名单里的应用、人在电脑前、画面有变化，她会截这个应用最前面的一个窗口（不是整个屏幕），缩放后发给视觉模型（${config.vision_model} · ${config.vision_base_url}）概括成一句话。`}
+        {`每隔几分钟，如果你正在用她在看的应用、人在电脑前、画面有变化，她会截这个应用最前面的一个窗口（不是整个屏幕），缩放后发给视觉模型（${config.vision_model} · ${config.vision_base_url}）概括成一句话。`}
         {
           "截图只在内存里，不保存；概括保留 7 天，你们聊天时她会知道你在忙什么。多数时候她安静陪着，偶尔说一句。她不会操作键盘鼠标。"
+        }
+        {
+          "不想常开的话，通话或聊天里说“这局陪我看着”，她会临时看你当前用的应用（默认 1 小时，到点自动停）。"
         }
       </p>
       {!config.has_vision_key && (
         <p className="agent-warning">
-          还没有可用的视觉模型 Key，请先在“屏幕观察”或模型设置里填写。
+          还没有可用的视觉模型 Key，请先在“看屏 · 看一眼”或模型设置里填写。
         </p>
+      )}
+      {watching && (
+        <div className="settings-actions">
+          <span className="tool-hint">
+            正在临时陪着看 {config.watch_apps.join("、")}，到 {clock(config.watch_until)} 自动结束。
+          </span>
+          <button
+            className="small-button"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => setConfig(await api.updateCompanionConfig({ stop_watch: true })))
+            }
+          >
+            现在停止
+          </button>
+        </div>
       )}
       {needsConsent && (
         <label className="field">
@@ -165,7 +185,7 @@ export default function CompanionSettingsCard() {
               checked={agree}
               onChange={(event) => setAgree(event.target.checked)}
             />
-            我同意把名单内应用的窗口截图发给上面的视觉模型服务
+            我同意她陪着看时把窗口截图发给上面的视觉模型服务（常开和语音临时开都需要这一步）
           </span>
         </label>
       )}
@@ -265,13 +285,13 @@ export default function CompanionSettingsCard() {
         <button
           className="small-button"
           onClick={() => void checkNow()}
-          disabled={busy || !config.enabled}
+          disabled={busy || !(config.enabled || watching)}
         >
           现在看一眼
         </button>
         <button
           className="small-button"
-          disabled={busy || !config.enabled}
+          disabled={busy || !(config.enabled || watching)}
           onClick={() => void run(async () => setConfig(await api.pauseCompanion(paused ? 0 : 60)))}
         >
           {paused ? "恢复" : "暂停 1 小时"}
@@ -316,7 +336,7 @@ export default function CompanionSettingsCard() {
       {notice && <div className="success-banner">{notice}</div>}
       <p className="tool-hint">
         需要后端有「屏幕录制」权限：系统设置 → 隐私与安全性 →
-        屏幕录制，允许启动后端的终端。聊天里说“帮我看看”时，她也只看名单内的窗口。
+        屏幕录制，允许启动后端的终端。设了名单时，你让她“看一眼”也只看名单内的窗口（前台是建过档的游戏除外）。
       </p>
     </div>
   );
