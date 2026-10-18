@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -32,6 +33,17 @@ def make_repo() -> Path:
 
 
 class WorkspaceTests(unittest.TestCase):
+    def test_merge_works_without_any_git_identity(self) -> None:
+        # CI 和没配过 git 的电脑上都没有 user.name/email
+        no_identity = {"HOME": tempfile.mkdtemp(), "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
+                       # macOS 的 git 会拿主机名猜一个身份，Linux 上不会；让它只认配置，两边一致
+                       "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "user.useConfigOnly", "GIT_CONFIG_VALUE_0": "true"}
+        with patch.dict(os.environ, no_identity):
+            workdir, _ = agent_workspace.prepare(12, str(self.repo))
+            (Path(workdir) / "README.md").write_text("by agent\n", encoding="utf-8")
+            self.assertIn("main", agent_workspace.merge(12, "改 README"))
+        self.assertEqual((self.repo / "README.md").read_text(), "by agent\n")
+
     def setUp(self) -> None:
         self.root = Path(tempfile.mkdtemp()).resolve() / "worktrees"
         patcher = patch.object(agent_workspace, "ROOT", self.root)

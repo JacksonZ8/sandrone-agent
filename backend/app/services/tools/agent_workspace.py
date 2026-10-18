@@ -60,6 +60,13 @@ def prepare(root_task_id: int, cwd: str) -> tuple[str, str]:
     return str(workdir), gitdir
 
 
+def _identity(repo: str | Path) -> list[str]:
+    """提交要有作者：仓库或你的 git 配置里有就用你的，没有就署名 Sandrone（否则没配过 git 的电脑上提交会失败）。"""
+    if _git(repo, "config", "user.email", check=False).stdout.strip():
+        return []
+    return ["-c", "user.name=Sandrone", "-c", "user.email=sandrone@localhost"]
+
+
 def _source_repo(root_task_id: int) -> Path:
     """工作区属于哪个仓库（主仓库的工作目录）。"""
     path, _ = location(root_task_id)
@@ -98,11 +105,11 @@ def merge(root_task_id: int, title: str) -> str:
     _git(path, "add", "-A")
     if _git(path, "diff", "--cached", "--quiet", check=False).returncode != 0:
         _git(path, "-c", "user.name=Sandrone", "-c", "user.email=sandrone@localhost",
-             "commit", "--no-verify", "-m", f"Sandrone task #{root_task_id}: {title}"[:200])
+             "commit", "--no-verify", "-m", f"Sandrone task #{root_task_id}: {title}"[:200])  # 改动是她派的智能体做的
     if _git(repo, "rev-list", "--count", f"HEAD..{branch}").stdout.strip() == "0":
         discard(root_task_id)
         return "没有需要合并的改动，工作区已清理。"
-    result = _git(repo, "merge", "--no-ff", "--no-edit", branch, check=False)
+    result = _git(repo, *_identity(repo), "merge", "--no-ff", "--no-edit", branch, check=False)
     if result.returncode != 0:
         _git(repo, "merge", "--abort", check=False)
         detail = (result.stderr or result.stdout).strip()[:300]
