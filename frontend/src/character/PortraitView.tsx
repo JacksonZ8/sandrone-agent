@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { CALM, ease, FaceClock } from "./expression";
 import { loadPortraitPack, type LoadedPack, type PatchInfo } from "./portraitPack";
 
 interface Props {
@@ -10,15 +11,6 @@ interface Props {
   /** 她当前说话音量（RMS，约 0–0.3），驱动张嘴 */
   level?: () => number;
   onError: (message: string) => void;
-}
-
-const CALM = "平静";
-const SWITCH_MS = 220; // 换表情的过渡时长
-const RETURN_TO_CALM_MS = 6000; // 带情绪说完后多久回到平静
-const BLINK_MS = 150;
-
-function ease(t: number): number {
-  return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
 }
 
 /**
@@ -49,16 +41,7 @@ export default function PortraitView({
     let disposed = false;
     let pack: LoadedPack | null = null;
 
-    // 动画状态
-    let shown = CALM;
-    let previous = CALM;
-    let switchedAt = -Infinity;
-    let lastEmotionAt = 0;
-    let lastWanted: string | null | undefined;
-    let mouth = 0;
-    let nextBlink = performance.now() + 1500 + Math.random() * 2500;
-    let blinkStart = -Infinity;
-    let doubleBlink = false;
+    const clock = new FaceClock(performance.now());
     let lastDraw = 0;
     const minInterval = size === "avatar" ? 1000 / 24 : 0;
 
@@ -130,38 +113,15 @@ export default function PortraitView({
       const { emotion: wanted, speaking: talking, level: read } = props.current;
       const manifest = pack.manifest;
 
-      // 目标表情：带情绪说完后停留一会儿再回到平静；素材包没有的名字按平静处理
-      let target = wanted && manifest.emotions[wanted] ? wanted : CALM;
-      if (wanted !== lastWanted || talking) {
-        lastWanted = wanted;
-        lastEmotionAt = now;
-      }
-      if (target !== CALM && now - lastEmotionAt > RETURN_TO_CALM_MS) target = CALM;
-      if (target !== shown && pack.image(manifest.emotions[target].master)) {
-        previous = shown;
-        shown = target;
-        switchedAt = now;
-      }
-
-      // 口型：快开慢合，说话停止时自然收口
-      const raw = talking && read ? Math.min(1, read() * 5) : 0;
-      mouth += (raw - mouth) * (raw > mouth ? 0.55 : 0.25);
-
-      // 眨眼：2–6 秒一次，偶尔连眨两下
-      let blink = 0;
-      if (now >= nextBlink) {
-        blinkStart = now;
-        doubleBlink = Math.random() < 0.18;
-        nextBlink = now + 2000 + Math.random() * 4000;
-      }
-      const sinceBlink = now - blinkStart;
-      const blinkSpan = doubleBlink ? BLINK_MS * 2.4 : BLINK_MS;
-      if (sinceBlink < blinkSpan) {
-        const local = doubleBlink
-          ? (sinceBlink % (BLINK_MS * 1.2)) / BLINK_MS
-          : sinceBlink / BLINK_MS;
-        blink = local <= 1 ? Math.sin(Math.PI * Math.min(1, local)) : 0;
-      }
+      const face = clock.step(
+        now,
+        wanted,
+        talking,
+        talking && read ? read() : 0,
+        (name) => Boolean(manifest.emotions[name]),
+        (name) => Boolean(pack?.image(manifest.emotions[name].master)),
+      );
+      const mouth = face.mouth;
 
       // 取景：头像只看脸，其它显示整格并贴底
       const crop = size === "avatar" ? manifest.framing.avatar : manifest.framing.full;
@@ -193,12 +153,11 @@ export default function PortraitView({
       context.translate(offsetX, offsetY);
       context.scale(scale, scale);
 
-      const progress = Math.min(1, (now - switchedAt) / SWITCH_MS);
-      if (progress < 1) {
-        drawEmotion(context, previous, 1, mouth, 0);
-        drawEmotion(context, shown, ease(progress), mouth, 0);
+      if (face.progress < 1) {
+        drawEmotion(context, face.previous, 1, mouth, 0);
+        drawEmotion(context, face.shown, ease(face.progress), mouth, 0);
       } else {
-        drawEmotion(context, shown, 1, mouth, blink);
+        drawEmotion(context, face.shown, 1, mouth, face.blink);
       }
       context.globalAlpha = 1;
     };

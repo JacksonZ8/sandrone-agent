@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import HerAvatar from "../character/HerAvatar";
 import ui from "../ui/ui.module.css";
 import { formatDuration, toolArgPreview, toolLabel } from "./format";
 import styles from "./LiveStatus.module.css";
@@ -39,7 +40,8 @@ export default function LiveStatus({ events, startedAt, partial = "" }: Props) {
 
   return (
     <div className={styles.wrap} role="status" aria-live="polite">
-      <div className={`${ui.glass} ${styles.line}`}>
+      <HerAvatar className={styles.avatar} />
+      <div className={styles.line}>
         <span className={styles.spinner} aria-hidden="true" />
         <span className={styles.activity}>{status.activity || "她在想…"}</span>
         {status.steps > 0 && (

@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import APP_NAME, APP_VERSION, AUDIO_CACHE_DIR, CHARACTER_DIR, FRONTEND_DIST, LIVE2D_DIR
 from .database import init_db
 from .logging_setup import log_asyncio_exceptions, setup_logging
-from .routers import agent_tasks, chat, companion, games, live2d, memories, proactive, providers, push, state, tools, tts, usage, voice, wechat
+from .routers import agent_tasks, chat, companion, games, live2d, memories, pet, proactive, providers, push, state, tools, tts, usage, voice, wechat
 from .security import LocalRequestGuard
 from .services.agent_tasks import recover_interrupted_tasks, stop_running_tasks
 from .services.backup_service import DAILY_BACKUP
@@ -84,6 +84,7 @@ app.include_router(live2d.router)
 app.include_router(push.router)
 app.include_router(companion.router)
 app.include_router(games.router)
+app.include_router(pet.router)
 
 
 @app.get("/health")

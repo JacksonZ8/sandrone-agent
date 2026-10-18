@@ -30,15 +30,15 @@ export default function ScreenSettingsCard() {
     setSaving(true);
     setNotice("");
     try {
+      // 看屏的开关在“她能做什么”里，这里只存视觉模型
       const config = await api.updateScreenToolConfig({
-        screen_enabled: screenTool?.screen_enabled ?? false,
         vision_base_url: visionBaseUrl.trim(),
         vision_model: visionModel.trim(),
         vision_api_key: visionKeyInput.trim() || null,
       });
       setScreenTool(config);
       setVisionKeyInput("");
-      setNotice("看屏配置已保存。");
+      setNotice("已保存。");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : String(error));
     } finally {
@@ -48,28 +48,14 @@ export default function ScreenSettingsCard() {
 
   return (
     <div className="settings-card">
-      <h3>看屏 · 看一眼</h3>
+      <h3>视觉模型（看屏用）</h3>
       {loading ? (
         <div className="chat-hint">正在读取屏幕设置…</div>
       ) : (
         <>
-          <label className="field">
-            <span className="inline-check">
-              <input
-                type="checkbox"
-                checked={screenTool?.screen_enabled ?? false}
-                onChange={(event) =>
-                  setScreenTool(
-                    screenTool ? { ...screenTool, screen_enabled: event.target.checked } : null,
-                  )
-                }
-              />
-              允许她看屏幕（只读）
-            </span>
-          </label>
           <p className="chat-hint">
-            开启后，你让她看时她才截图：前台是游戏时只截游戏窗口，设了“陪着看”应用名单时只截名单内最前面的窗口，否则截整个屏幕；缩放后发给下方视觉模型，留空时使用对话模型的地址与
-            Key。截图分析后即删除，但发送前请留意屏幕上的私密内容。认出没建档的游戏会自动加进“游戏”。
+            三项都留空就用对话模型的地址和 Key（DeepSeek 默认是
+            deepseek-v4-flash-vision-exp）。截图分析后即删除。
           </p>
           <label className="field">
             <span>视觉模型 Base URL（留空使用聊天 Base URL）</span>
@@ -102,14 +88,15 @@ export default function ScreenSettingsCard() {
           </label>
           <div className="settings-actions">
             <button className="small-button primary" onClick={() => void save()} disabled={saving}>
-              {saving ? "保存中…" : "保存屏幕配置"}
+              {saving ? "保存中…" : "保存"}
             </button>
           </div>
         </>
       )}
       {notice && <div className="success-banner">{notice}</div>}
       <p className="tool-hint">
-        聊天或通话中可以说：看看我的屏幕 / 这张牌该不该拿 / 讲讲屏幕上这道题。
+        聊天或通话中可以说：看看我的屏幕 / 这张牌该不该拿 /
+        讲讲屏幕上这道题。认出没建档的游戏会自动加进“游戏”。
       </p>
     </div>
   );

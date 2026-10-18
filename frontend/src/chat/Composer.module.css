@@ -1,20 +1,38 @@
-.composer {
-  padding: 10px 10px 8px 16px;
-  border-radius: var(--radius-sheet);
+.wrap {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
+/* 单行输入条：长短切换 · 输入 · 通话 · 发送，按钮贴底，输入长高时跟着下沿 */
+.composer {
+  min-height: 56px;
+  padding: 8px;
+  border-radius: 28px;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.composer:focus-within {
+  box-shadow:
+    inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, var(--ring)),
+    var(--shadow-lift);
+}
+
 .composer textarea {
-  width: 100%;
-  min-height: 32px;
-  padding: 4px 0;
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+  max-height: 168px;
+  padding: 8px 4px;
   border: none;
+  border-radius: 0;
   background: transparent;
   box-shadow: none;
   resize: none;
   line-height: 1.6;
+  overflow-y: auto;
 }
 
 .composer textarea:focus-visible {
@@ -25,24 +43,54 @@
   color: var(--ink-3);
 }
 
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.length {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 50%;
+  background: var(--track);
+  color: var(--ink-2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
 }
 
-.spacer {
-  flex: 1;
-}
-
-.mic:not(:disabled):hover {
+.length:hover {
   background: var(--tag);
   color: var(--accent-ink);
 }
 
+.call {
+  height: 40px;
+  flex: 0 0 auto;
+  padding: 0 14px 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--tag);
+  color: var(--accent-ink);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out);
+}
+
+.call:not(:disabled):hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.call:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .send {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -57,16 +105,29 @@
 }
 
 .send:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: default;
   box-shadow: none;
 }
 
 .warning {
-  margin-right: 6px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-radius: var(--radius-control);
-  background: rgba(214, 166, 83, 0.16);
+  background: rgba(214, 166, 83, 0.2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: var(--ink);
   font-size: 12px;
+}
+
+@media (max-width: 380px) {
+  .call {
+    width: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .callText {
+    display: none;
+  }
 }

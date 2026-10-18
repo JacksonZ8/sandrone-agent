@@ -7,7 +7,7 @@ import { useLive2DStatus } from "../live2d/status";
 import { currentSubscription, disablePush, enablePush, pushSupport } from "../pushNotifications";
 import CharacterStage from "../stage/CharacterStage";
 import type { AppState, DiaryEntry, ProactiveConfig, RelationshipState } from "../types";
-import { ChevronIcon } from "../ui/icons";
+import { BookIcon, ChartIcon, ChevronIcon, GamepadIcon, ImageIcon, SlidersIcon } from "../ui/icons";
 import ui from "../ui/ui.module.css";
 import styles from "./HerScreen.module.css";
 
@@ -116,13 +116,14 @@ export default function HerScreen({ appState, navigate }: Props) {
   }
 
   const live2d = useLive2DStatus();
+  // 显示优先级与 CharacterStage 一致：Cubism 模型 > 表情母版网格形变 > 剪影
   const live2dHint = !live2d
     ? "读取中…"
     : live2d.ready
-      ? `已加载 ${live2d.model_url?.split("/").pop() ?? ""}`
-      : !live2d.core_present
-        ? "缺少 Cubism Core：把 live2dcubismcore.min.js 放进 data/live2d"
-        : "缺少模型：把含 .model3.json 的模型文件夹放进 data/live2d";
+      ? `Cubism 模型：${live2d.model_url?.split("/").pop() ?? ""}`
+      : live2d.portrait_url
+        ? "用她的表情母版做网格形变（类 Live2D）；放进 Cubism 模型与 Core 后自动换用"
+        : "没有形象素材，显示剪影；素材放法见 docs/character.md";
   const mood = appState?.agent_state.mood;
   const focus = appState?.agent_state.focus;
   const latest = diary[0];
@@ -211,7 +212,10 @@ export default function HerScreen({ appState, navigate }: Props) {
         {notice && <p className={ui.hint}>{notice}</p>}
       </section>
 
-      <section className={ui.list} aria-label="设置">
+      <div className={ui.sectionHead}>
+        <h2 className={ui.sectionTitle}>相处方式</h2>
+      </div>
+      <section className={ui.list} aria-label="相处方式">
         <label className={ui.row}>
           <span className={ui.rowText}>
             让她主动找你
@@ -289,20 +293,28 @@ export default function HerScreen({ appState, navigate }: Props) {
         </label>
         <div className={ui.row} role="note">
           <span className={ui.rowText}>
-            Live2D 形象
+            她的形象
             <span className={ui.rowHint}>{live2dHint}</span>
           </span>
         </div>
+      </section>
+
+      {/* 窄屏的入口；宽屏左侧常驻侧栏已有，不重复 */}
+      <div className={`${ui.sectionHead} ${styles.more}`}>
+        <h2 className={ui.sectionTitle}>更多</h2>
+      </div>
+      <section className={`${ui.list} ${styles.more}`} aria-label="更多">
         {(
           [
-            ["wallpaper", "壁纸与玻璃"],
-            ["memory", "她记得的事"],
-            ["games", "游戏"],
-            ["settings", "模型、微信与工具"],
-            ["usage", "API 用量"],
+            ["memory", "她记得的事", BookIcon],
+            ["games", "游戏", GamepadIcon],
+            ["wallpaper", "壁纸与玻璃", ImageIcon],
+            ["settings", "模型、微信与工具", SlidersIcon],
+            ["usage", "API 用量", ChartIcon],
           ] as const
-        ).map(([route, label]) => (
+        ).map(([route, label, RowIcon]) => (
           <button key={route} type="button" className={ui.row} onClick={() => navigate(route)}>
+            <RowIcon size={18} className={styles.rowIcon} />
             <span className={ui.rowText}>{label}</span>
             <ChevronIcon size={14} className={styles.chevron} />
           </button>

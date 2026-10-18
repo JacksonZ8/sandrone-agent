@@ -1,18 +1,27 @@
+/* 与她的消息同一套版式：头像列 + 正在形成的回复 */
 .wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 6px;
+  justify-items: start;
+}
+
+.wrap > :not(.avatar) {
+  grid-column: 2;
+}
+
+.avatar {
+  composes: avatar from "./MessageItem.module.css";
 }
 
 .line {
   max-width: 100%;
-  min-height: 32px;
-  padding: 0 12px;
+  min-height: 24px;
+  padding: 0 2px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border-radius: var(--radius-pill);
   font-size: 12px;
   color: var(--ink-2);
 }
@@ -50,7 +59,7 @@
   display: inline-flex;
   gap: 5px;
   padding: 14px 18px;
-  border-radius: 22px;
+  border-radius: 6px 22px 22px 22px;
 }
 
 .typing span {
@@ -95,9 +104,9 @@
 }
 
 .partial {
-  align-self: flex-start;
-  max-width: min(100%, 560px);
+  max-width: 100%;
   padding: 12px 16px;
+  border-radius: 6px 22px 22px 22px;
   font-size: 15px;
   line-height: 1.7;
   white-space: pre-wrap;

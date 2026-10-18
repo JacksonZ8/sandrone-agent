@@ -1,7 +1,8 @@
-import { memo, useState, type ReactNode } from "react";
+import { memo, useState, type MouseEvent, type ReactNode } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import HerAvatar from "../character/HerAvatar";
 import type { Message } from "../types";
 import { CheckIcon, CopyIcon, PauseIcon, PlayIcon, RegenerateIcon, TrashIcon } from "../ui/icons";
 import ui from "../ui/ui.module.css";
@@ -44,6 +45,10 @@ interface Props {
   message: Message;
   /** 她主动发来的消息（没有对应的用户发言） */
   initiated: boolean;
+  /** 紧接着同一个人的上一条：不重复头像，间距收紧 */
+  continued: boolean;
+  /** 时间线上最新的一条：操作行常显，其余悬停或点按才出现 */
+  latest: boolean;
   showActions: boolean;
   voiceReady: boolean;
   synthesizing: boolean;
@@ -59,6 +64,8 @@ interface Props {
 function MessageItem({
   message,
   initiated,
+  continued,
+  latest,
   showActions,
   voiceReady,
   synthesizing,
@@ -72,18 +79,29 @@ function MessageItem({
   const [openMemory, setOpenMemory] = useState(false);
   const [openTools, setOpenTools] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [revealed, setRevealed] = useState(false);
   const time = timeLabel(message.created_at);
   const fromWeChat = message.channel === "wechat_dm";
   const fromCall = message.channel === "voice";
 
+  // 触屏没有悬停：点一下消息显示或收起操作行（点链接、按钮或选中文字时不算）
+  function reveal(event: MouseEvent<HTMLElement>) {
+    if (!window.matchMedia("(hover: none)").matches) return;
+    if ((event.target as HTMLElement).closest("a, button, summary, pre")) return;
+    if (window.getSelection()?.toString()) return;
+    setRevealed((value) => !value);
+  }
+
   if (message.role === "user") {
     return (
-      <div className={styles.userRow}>
+      <div
+        className={styles.userRow}
+        data-continued={continued}
+        data-revealed={revealed}
+        onClick={reveal}
+      >
         <div className={styles.mine}>{message.content}</div>
         <div className={styles.userMeta}>
-          {fromWeChat && <span className={styles.badge}>微信</span>}
-          {fromCall && <span className={styles.callBadge}>通话</span>}
-          <span>{time}</span>
           <button
             type="button"
             className={styles.metaButton}
@@ -93,6 +111,9 @@ function MessageItem({
           >
             <TrashIcon size={14} />
           </button>
+          {fromWeChat && <span className={styles.badge}>微信</span>}
+          {fromCall && <span className={styles.callBadge}>通话</span>}
+          <span>{time}</span>
         </div>
       </div>
     );
@@ -112,91 +133,108 @@ function MessageItem({
   }
 
   return (
-    <div className={styles.assistantRow}>
+    <div
+      className={styles.assistantRow}
+      data-continued={continued}
+      data-latest={latest}
+      data-revealed={revealed || openMemory || openTools}
+      onClick={reveal}
+    >
       {initiated && (
-        <div className={`${ui.glass} ${styles.chip}`}>
+        <div className={styles.chip}>
           {time} · 她主动{fromWeChat ? "发到微信" : "发来"}
         </div>
       )}
-      <article
-        className={`${ui.card} ${ui.lifted} ${styles.reply}`}
-        data-regenerating={regenerating}
-        aria-busy={regenerating}
-      >
-        <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={markdownComponents}>
-          {visibleContent(message.content, showActions)}
-        </ReactMarkdown>
-      </article>
+      {continued ? (
+        <span className={styles.gutter} aria-hidden="true" />
+      ) : (
+        <HerAvatar className={styles.avatar} />
+      )}
+      <div className={styles.body}>
+        <article
+          className={`${ui.card} ${ui.lifted} ${styles.reply}`}
+          data-regenerating={regenerating}
+          data-playing={playing}
+          aria-busy={regenerating}
+        >
+          <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={markdownComponents}>
+            {visibleContent(message.content, showActions)}
+          </ReactMarkdown>
+        </article>
 
-      <div className={styles.actions}>
-        <button
-          type="button"
-          className={`${ui.iconButton} ${ui.small}`}
-          aria-label={copied ? "已复制" : "复制"}
-          title={copied ? "已复制" : "复制"}
-          onClick={() => void copy()}
-        >
-          {copied ? <CheckIcon /> : <CopyIcon />}
-        </button>
-        {canRegenerate && (
-          <button
-            type="button"
-            className={`${ui.iconButton} ${ui.small}`}
-            aria-label="重新回答"
-            title="重新回答"
-            onClick={() => onRegenerate(message)}
-          >
-            <RegenerateIcon />
-          </button>
-        )}
-        <button
-          type="button"
-          className={`${ui.iconButton} ${ui.small}`}
-          aria-label="删除这条消息"
-          title="删除"
-          disabled={regenerating}
-          onClick={() => onDelete(message)}
-        >
-          <TrashIcon />
-        </button>
-        {(voiceReady || message.audio_path) && (
-          <button
-            type="button"
-            className={`${ui.glass} ${styles.listen}`}
-            aria-label={playing ? "暂停" : "听她说"}
-            disabled={synthesizing}
-            onClick={() => onListen(message)}
-          >
-            {playing ? <PauseIcon size={12} /> : <PlayIcon size={12} />}
-            {synthesizing ? "合成中…" : playing ? "暂停" : "听她说"}
-          </button>
-        )}
-        {memories.length > 0 && (
-          <button
-            type="button"
-            className={styles.toggle}
-            aria-expanded={openMemory}
-            onClick={() => setOpenMemory((value) => !value)}
-          >
-            回忆 · {memories.length}
-          </button>
-        )}
-        {tools.length > 0 && (
-          <button
-            type="button"
-            className={styles.toggle}
-            aria-expanded={openTools}
-            onClick={() => setOpenTools((value) => !value)}
-          >
-            过程 · {tools.length}
-          </button>
-        )}
-        <span className={styles.meta}>
-          {fromWeChat && !initiated && <span className={styles.badge}>微信</span>}
-          {fromCall && <span className={styles.callBadge}>通话</span>}
-          {message.latency_ms > 0 && <span>用时 {formatDuration(message.latency_ms)}</span>}
-          <span>{time}</span>
-        </span>
+        <div className={styles.actions}>
+          {memories.length > 0 && (
+            <button
+              type="button"
+              className={styles.toggle}
+              aria-expanded={openMemory}
+              onClick={() => setOpenMemory((value) => !value)}
+            >
+              回忆 · {memories.length}
+            </button>
+          )}
+          {tools.length > 0 && (
+            <button
+              type="button"
+              className={styles.toggle}
+              aria-expanded={openTools}
+              onClick={() => setOpenTools((value) => !value)}
+            >
+              过程 · {tools.length}
+            </button>
+          )}
+          <span className={styles.meta}>
+            {fromWeChat && !initiated && <span className={styles.badge}>微信</span>}
+            {fromCall && <span className={styles.callBadge}>通话</span>}
+            {[message.latency_ms > 0 ? `用时 ${formatDuration(message.latency_ms)}` : "", time]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+          <span className={styles.tools} data-pinned={playing || synthesizing}>
+            {(voiceReady || message.audio_path) && (
+              <button
+                type="button"
+                className={styles.listen}
+                aria-label={playing ? "暂停" : "听她说"}
+                disabled={synthesizing}
+                onClick={() => onListen(message)}
+              >
+                {playing ? <PauseIcon size={12} /> : <PlayIcon size={12} />}
+                {synthesizing ? "合成中…" : playing ? "暂停" : "听她说"}
+              </button>
+            )}
+            <button
+              type="button"
+              className={`${ui.iconButton} ${ui.small}`}
+              aria-label={copied ? "已复制" : "复制"}
+              title={copied ? "已复制" : "复制"}
+              onClick={() => void copy()}
+            >
+              {copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
+            </button>
+            {canRegenerate && (
+              <button
+                type="button"
+                className={`${ui.iconButton} ${ui.small}`}
+                aria-label="重新回答"
+                title="重新回答"
+                onClick={() => onRegenerate(message)}
+              >
+                <RegenerateIcon size={16} />
+              </button>
+            )}
+            <button
+              type="button"
+              className={`${ui.iconButton} ${ui.small} ${styles.remove}`}
+              aria-label="删除这条消息"
+              title="删除"
+              disabled={regenerating}
+              onClick={() => onDelete(message)}
+            >
+              <TrashIcon size={16} />
+            </button>
+          </span>
+        </div>
       </div>
 
       {openMemory && (

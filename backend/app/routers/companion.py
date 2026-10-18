@@ -58,7 +58,7 @@ def read_companion_status() -> dict:
 
 @router.get("/apps", response_model=list[str])
 async def read_running_apps() -> list[str]:
-    """正在运行的普通应用名，供设置页挑选名单。"""
+    """正在运行的普通应用名，供设置页挑选她不看的应用。"""
     try:
         return await asyncio.to_thread(COMPANION.desktop.running_apps)
     except Exception as exc:  # noqa: BLE001
@@ -67,7 +67,7 @@ async def read_running_apps() -> list[str]:
 
 @router.post("/check", response_model=CompanionCheckResult)
 async def check_now() -> dict:
-    """立刻看一眼名单内最前面的窗口（忽略间隔与画面未变），用于试用和确认权限。"""
+    """立刻看一眼设置页后面最前面的、她可以看的窗口（忽略间隔与画面未变），用于试用和确认权限。"""
     result = await COMPANION.tick(force=True)
     return {"result": result, "status": companion_status_public()}
 

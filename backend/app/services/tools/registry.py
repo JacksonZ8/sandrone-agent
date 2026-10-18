@@ -27,7 +27,7 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "只读读取本机文本/代码文件；如果路径是目录，则列出目录内容。支持绝对路径、~、桌面/下载等别名，也可以只给文件名（白名单内唯一匹配）。禁止写入。",
+            "description": "只读读取本机文本/代码文件；如果路径是目录，则列出目录内容。支持绝对路径、~、桌面/下载等别名，也可以只给文件名（在桌面、文稿、下载里找唯一匹配）。可读范围是用户主目录，资源库、隐藏文件夹和密钥类文件不能读。禁止写入。",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -131,13 +131,14 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "delegate_agent",
-            "description": "把项目级、跨文件的代码/文档分析或修改交给本地 CLI 子代理（Claude Code 或 Codex）。调用后只会生成一张任务卡，不会立刻执行、也不会马上有结果：用户确认后在后台执行，做完会通知。权限由用户配置决定：只读模式不写文件；写入模式可以修改授权目录内的文件。仅在单个 read_file 不足以完成任务时才使用。",
+            "description": "把项目级、跨文件的代码/文档分析或修改交给这台电脑上的编程智能体（Claude Code、Codex、Hermes 或 Oh-DSH）。用户点名要哪个就用哪个。调用后只会生成一张任务卡，不会立刻执行、也不会马上有结果：用户确认后在后台执行，做完会通知。权限由用户配置决定：只读模式不写文件；写入模式可以修改授权目录内的文件。仅在单个 read_file 不足以完成任务时才使用。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "prompt": {"type": "string", "description": "交给子代理的完整任务，包含目标、关注点、希望返回的格式；要保留用户要求的最终用途和约束，不要替子代理先做答"},
                     "title": {"type": "string", "description": "任务卡标题，十来个字的中文短语"},
                     "spoken_summary": {"type": "string", "description": "一句口语化的中文摘要，说清让谁做什么、在哪个项目、有什么重要约束；语音通话里会照着念给用户确认"},
+                    "agent": {"type": "string", "enum": ["claude", "codex", "opencode", "hermes", "ohdsh"], "description": "交给哪个智能体：claude=Claude Code，codex=Codex（就是 ChatGPT 桌面版里的 Codex，派的任务在 ChatGPT 里也看得到；用户说让 ChatGPT 做也选它），opencode=OpenCode，hermes=Hermes，ohdsh=Oh-DSH（DeepSeek Harness）。用户没点名就不填，用设置里的默认。续接任务时忽略"},
                     "cwd": {"type": "string", "description": "要处理的项目目录；留空则使用设置中的第一个允许目录。续接任务或接着 Codex App 线程时忽略"},
                     "continue_task_id": {"type": "integer", "description": "接着之前某个子代理任务继续（同一个会话，记得上次做了什么）时填它的编号"},
                     "codex_thread": {"type": "string", "description": "用户明确要接着他在 Codex App 里的某个已有线程继续时，填线程标题里的关键词或线程 id；没提就不要填"}

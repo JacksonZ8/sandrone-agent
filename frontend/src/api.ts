@@ -1,5 +1,6 @@
 import type {
   AgentRunResponse,
+  AgentLive,
   AgentTask,
   AgentTaskAction,
   CodexThread,
@@ -233,7 +234,7 @@ export const api = {
     data: Partial<
       Pick<
         CompanionConfig,
-        "enabled" | "allowed_apps" | "interval_minutes" | "remark_gap_minutes" | "notify"
+        "enabled" | "hidden_apps" | "interval_minutes" | "remark_gap_minutes" | "notify"
       >
     > & { consent?: boolean; stop_watch?: boolean },
   ) =>
@@ -379,6 +380,18 @@ export const api = {
 
   confirmAgentTask: (id: number) =>
     request<AgentTaskAction>(`/api/agent-tasks/${id}/confirm`, { method: "POST" }),
+
+  getAgentTaskLive: (id: number) =>
+    request<{ live: AgentLive | null }>(`/api/agent-tasks/${id}/live`),
+
+  answerAgentPermission: (id: number, optionId: string) =>
+    request<AgentTaskAction>(`/api/agent-tasks/${id}/permission`, {
+      method: "POST",
+      body: JSON.stringify({ option_id: optionId }),
+    }),
+
+  resolveAgentWorkspace: (id: number, action: "merge" | "discard") =>
+    request<AgentTaskAction>(`/api/agent-tasks/${id}/workspace/${action}`, { method: "POST" }),
 
   cancelAgentTask: (id: number) =>
     request<AgentTaskAction>(`/api/agent-tasks/${id}/cancel`, { method: "POST" }),

@@ -7,6 +7,7 @@ from sqlmodel import Session
 
 from ..database import get_session
 from ..schemas import UsageSummaryResponse
+from ..services.usage.balance import fetch_balance
 from ..services.usage_service import get_usage_summary
 
 router = APIRouter(prefix="/api/usage", tags=["usage"])
@@ -29,3 +30,9 @@ def read_usage_summary(
         provider=provider.strip(),
         purpose=purpose.strip(),
     )
+
+
+@router.post("/balance")
+def read_deepseek_balance(session: Session = Depends(get_session)) -> dict:
+    """DeepSeek 账户余额，给桌宠连击反馈用。用 POST：会对外请求并写审计，跨站页面不能顺手触发。"""
+    return fetch_balance(session)

@@ -177,10 +177,10 @@ def call_vision(
 def _capture_for_help(session: Session) -> tuple[bytes | None, str, str, GameProfile | None]:
     """看一眼的单次截图，返回 (图片, 拒绝原因, 前台应用, 对上的游戏档案)。
 
-    前台是建过档的游戏时只截游戏窗口；否则设了“陪着看”应用名单时只截名单内最前面的窗口，再否则截整屏。
+    前台是建过档的游戏时只截游戏窗口；屏幕上有她不看的应用（密码、聊天等）时只截她可以看的最前面的窗口，否则截整屏。
     """
     from ..games.profiles import game_for_app
-    from ..screen_companion import allowed_apps
+    from ..screen_companion import hidden_apps
 
     try:
         snapshot = MAC_DESKTOP.snapshot()
@@ -193,16 +193,20 @@ def _capture_for_help(session: Session) -> tuple[bytes | None, str, str, GamePro
         if window is not None:
             return MAC_DESKTOP.capture(window.id).jpeg, "", app, game
 
-    apps = allowed_apps(session)
-    if not apps:
+    hidden = hidden_apps(session)
+    if snapshot is not None and not any(window.app in hidden for window in snapshot.windows):
         image_path = _capture_screen()
         try:
             return image_path.read_bytes(), "", app, None
         finally:
             image_path.unlink(missing_ok=True)
-    window = (snapshot or MAC_DESKTOP.snapshot()).front_window(apps)
+    if snapshot is None:
+        # 读不到窗口信息就不知道屏幕上有没有不看的应用：宁可不截
+        return None, "读不到屏幕上的窗口信息，这次没有截图。", app, None
+    # 屏幕上有不看的应用：不截整屏，只截她可以看的最前面的窗口
+    window = snapshot.front_window({w.app for w in snapshot.windows if w.app not in hidden})
     if window is None:
-        return None, "屏幕上没有允许她看的应用窗口。可以在设置的“看屏 · 陪着看”里把应用加入名单。", app, None
+        return None, "屏幕上现在只有她不看的应用（密码、聊天之类），没有截图。", app, None
     return MAC_DESKTOP.capture(window.id).jpeg, "", window.app, None
 
 

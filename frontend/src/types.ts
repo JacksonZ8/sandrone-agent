@@ -231,6 +231,8 @@ export interface AgentToolConfig {
   agent_max_budget_usd: number;
   cli_available: boolean;
   cli_version: string;
+  /** 她能派活的智能体与本机是否装了 */
+  agents: { id: string; label: string; available: boolean; protocol: "acp" | "terminal" }[];
 }
 
 export interface AgentRunResponse {
@@ -251,7 +253,7 @@ export interface AgentTask {
   title: string;
   prompt: string;
   spoken_summary: string;
-  command: "claude" | "codex";
+  command: "claude" | "codex" | "opencode" | "hermes" | "ohdsh";
   permission: "readonly" | "write";
   cwd: string;
   status: AgentTaskStatus;
@@ -269,6 +271,40 @@ export interface AgentTask {
   finished_at: string | null;
   risks: string[];
   codex_url: string;
+  /** 显示用的智能体名字 */
+  agent_label: string;
+  /** 走 ACP 的智能体：执行中有实时过程，可能停下来问你要权限 */
+  live: boolean;
+  /** 终端类智能体（Oh-DSH）：执行中任务卡上有真终端 */
+  terminal: boolean;
+  /** 写入任务在独立工作区里还没合并的改动 */
+  workspace?: AgentWorkspace | null;
+}
+
+/** 写入任务的独立工作区（git worktree） */
+export interface AgentWorkspace {
+  path: string;
+  branch: string;
+  /** 合并进去的分支（你仓库当前的分支） */
+  target_branch: string;
+  /** git diff --name-status 的行，如 "M\tsrc/app.py" */
+  files: string[];
+  stat: string;
+  diff: string;
+}
+
+/** 执行中任务的实时过程 */
+export interface AgentLive {
+  text: string;
+  events: { kind: "status" | "tool" | "permission" | "denied"; text: string; at: number }[];
+  tools: { id: string; title: string; kind: string; status: string }[];
+  plan: { content: string; status: string }[];
+  pending_permission: {
+    title: string;
+    kind: string;
+    options: { optionId: string; name: string; kind: string }[];
+  } | null;
+  updated_at: number;
 }
 
 export interface AgentTaskAction {
@@ -360,7 +396,10 @@ export interface UsageSummary {
 
 export interface CompanionConfig {
   enabled: boolean;
-  allowed_apps: string[];
+  /** 她不看的应用（可编辑；默认是聊天、邮件、支付类） */
+  hidden_apps: string[];
+  /** 永远不看、不能放开的应用（密码、钥匙串、系统设置） */
+  always_hidden_apps: string[];
   interval_minutes: number;
   remark_gap_minutes: number;
   notify: boolean;

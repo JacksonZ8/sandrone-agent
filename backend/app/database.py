@@ -98,6 +98,9 @@ def _migrate_schema() -> None:
             ("watch_until", "DATETIME"),
             ("watch_apps", "TEXT NOT NULL DEFAULT '[]'"),
         ],
+        "screen_companion_config": [
+            ("hidden_apps", "TEXT NOT NULL DEFAULT ''"),
+        ],
         "screen_observations": [
             ("game_id", "INTEGER"),
             ("session_id", "INTEGER"),

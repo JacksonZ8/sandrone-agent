@@ -83,6 +83,13 @@ class ScreenAnalyzeResponse(BaseModel):
     message: str = ""
 
 
+class AgentAvailability(BaseModel):
+    id: str
+    label: str
+    available: bool
+    protocol: str  # acp / terminal
+
+
 class AgentToolConfig(BaseModel):
     agent_enabled: bool
     agent_command: str
@@ -93,6 +100,7 @@ class AgentToolConfig(BaseModel):
     agent_max_budget_usd: float
     cli_available: bool
     cli_version: str
+    agents: list[AgentAvailability]
 
 
 class AgentToolConfigUpdate(BaseModel):
@@ -142,6 +150,23 @@ class AgentTaskPublic(BaseModel):
     finished_at: datetime | None
     risks: list[str]
     codex_url: str
+    agent_label: str
+    live: bool  # 走 ACP 的智能体：执行中有实时过程，可能停下来问你要权限
+    terminal: bool  # 终端类智能体（Oh-DSH）：执行中任务卡上有真终端
+    workspace: AgentWorkspacePublic | None = None  # 写入任务的独立工作区里还没合并的改动
+
+
+class AgentWorkspacePublic(BaseModel):
+    path: str
+    branch: str
+    target_branch: str
+    files: list[str]  # git diff --name-status 的行
+    stat: str
+    diff: str
+
+
+class AgentPermissionAnswer(BaseModel):
+    option_id: str = Field(min_length=1, max_length=200)
 
 
 class AgentTaskActionResponse(BaseModel):

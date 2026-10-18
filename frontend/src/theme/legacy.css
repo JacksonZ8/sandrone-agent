@@ -1,4 +1,5 @@
-/* 设置与用量页沿用的全局类名，改用玻璃设计变量。对话、记忆等新页面使用 CSS Modules。 */
+/* 设置与用量页沿用的全局类名，改用玻璃设计变量；页面宽度与分区由 ui.module.css 的 page/section 负责。
+   对话、记忆等新页面使用 CSS Modules。 */
 
 .glass,
 .settings-card,
@@ -48,33 +49,6 @@ button:disabled {
   opacity: 0.55;
 }
 
-/* 页面容器 */
-.settings-panel,
-.usage-panel {
-  padding: 8px 14px 32px;
-}
-
-.panel-head {
-  max-width: 1100px;
-  margin: 0 auto 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 20px;
-}
-
-.panel-head h2 {
-  margin: 0 0 4px;
-  font-size: 18px;
-  font-weight: 500;
-}
-
-.panel-head p {
-  margin: 0;
-  color: var(--ink-2);
-  font-size: 13px;
-}
-
 /* 状态点 */
 .status {
   display: inline-flex;
@@ -113,9 +87,16 @@ button:disabled {
   font-size: 13px;
 }
 
+.ghost-button:not(:disabled):hover,
+.small-button:not(.primary):not(:disabled):hover {
+  background: var(--tag);
+  color: var(--accent-ink);
+}
+
 .small-button.primary {
   background: var(--accent);
   color: var(--on-accent);
+  box-shadow: 0 4px 12px rgba(20, 35, 50, 0.14);
 }
 
 .tiny-button {
@@ -176,8 +157,6 @@ button:disabled {
 }
 
 .empty-card {
-  max-width: 1100px;
-  margin: 20px auto;
   padding: 30px;
   text-align: center;
   color: var(--ink-2);
@@ -186,16 +165,26 @@ button:disabled {
 
 /* 设置卡片 */
 .settings-card {
-  max-width: 1100px;
-  margin: 0 auto 14px;
-  padding: 18px;
+  padding: 18px 20px;
   border-radius: var(--radius-card);
+  box-shadow:
+    inset 0 0 0 1px var(--ring),
+    var(--shadow-lift);
 }
 
 .settings-card h3 {
   margin: 0 0 14px;
   font-size: 15px;
   font-weight: 500;
+}
+
+/* 卡片里的说明与读取中提示：左对齐的小字，不是对话页那种居中提示 */
+.settings-card .chat-hint {
+  margin: 12px 0 0;
+  padding: 0;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.7;
 }
 
 .form-grid {
@@ -221,13 +210,55 @@ button:disabled {
 .inline-check {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   cursor: pointer;
   color: var(--ink);
 }
 
+/* 设置里的勾选框统一画成开关，与「她的资料」页一致 */
+.inline-check input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 24px;
+  margin: 0;
+  border-radius: 12px;
+  background: var(--track);
+  box-shadow: inset 0 0 0 1px var(--line);
+  cursor: pointer;
+  transition: background var(--dur-base) var(--ease-out);
+}
+
+.inline-check input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.inline-check input[type="checkbox"]:checked {
+  background: var(--accent);
+}
+
+.inline-check input[type="checkbox"]:checked::after {
+  transform: translateX(16px);
+}
+
+.inline-check input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .tool-hint {
-  margin-top: 10px;
+  margin: 10px 0 0;
   color: var(--ink-2);
   font-size: 12px;
   line-height: 1.7;
@@ -235,6 +266,8 @@ button:disabled {
 
 .settings-actions {
   margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -374,32 +407,50 @@ button:disabled {
 }
 
 /* 用量 */
+/* 筛选：一条玻璃工具栏，时间范围是分段控件，Provider/用途是紧凑下拉 */
 .usage-filters {
-  max-width: 1100px;
-  margin: 0 auto 14px;
+  padding: 8px;
   display: flex;
-  align-items: flex-end;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
+  border-radius: var(--radius-card);
+  background: rgba(var(--glass-rgb), var(--glass-alpha));
+  box-shadow: inset 0 0 0 1px var(--ring);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
 }
 
 .usage-range {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--track);
+}
+
+.usage-range .filter {
+  min-height: 30px;
+  background: none;
+}
+
+.usage-range .filter.active {
+  background: var(--knob);
 }
 
 .usage-filters label {
-  width: 180px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  color: var(--ink-2);
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: 12px;
 }
 
 .usage-filters select {
-  padding: 7px 10px;
+  width: auto;
+  min-width: 96px;
+  padding: 6px 10px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
 }
 
@@ -407,27 +458,23 @@ button:disabled {
   margin-left: auto;
 }
 
-.usage-banner {
-  max-width: 1100px;
-  margin: 0 auto 14px;
-}
-
 .usage-summary-grid {
-  max-width: 1100px;
-  margin: 0 auto 14px;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
   gap: 10px;
 }
 
 .usage-stat-card,
 .usage-card {
   border-radius: var(--radius-card);
+  box-shadow:
+    inset 0 0 0 1px var(--ring),
+    var(--shadow-lift);
 }
 
 .usage-stat-card {
   min-width: 0;
-  padding: 16px 18px;
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -440,7 +487,7 @@ button:disabled {
 
 .usage-stat-card strong {
   color: var(--accent-ink);
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 500;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
@@ -454,16 +501,12 @@ button:disabled {
 }
 
 .usage-breakdown-grid {
-  max-width: 1100px;
-  margin: 0 auto 14px;
   display: grid;
   grid-template-columns: 1fr;
   gap: 14px;
 }
 
 .usage-card {
-  max-width: 1100px;
-  margin: 0 auto 14px;
   overflow: hidden;
 }
 
@@ -599,25 +642,30 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 850px) {
-  .usage-summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 600px) {
+  .usage-refresh {
+    margin-left: 0;
   }
 }
 
-@media (max-width: 600px) {
-  .usage-summary-grid {
-    grid-template-columns: 1fr;
-  }
+/* 卡片里折叠起来的“更多选项”：默认收起，常用项留在外面 */
+.settings-more {
+  margin: 4px 0 2px;
+}
 
-  .usage-filters label,
-  .usage-refresh {
-    width: 100%;
-    margin-left: 0;
-  }
+.settings-more > summary {
+  cursor: pointer;
+  width: fit-content;
+  padding: 4px 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  list-style-position: inside;
+}
 
-  .panel-head {
-    flex-direction: column;
-    align-items: flex-start;
-  }
+.settings-more > summary:hover {
+  color: var(--ink);
+}
+
+.settings-more[open] > summary {
+  margin-bottom: 8px;
 }

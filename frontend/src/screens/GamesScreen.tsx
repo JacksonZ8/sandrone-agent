@@ -3,6 +3,7 @@ import { api } from "../api";
 import type { Route } from "../app/route";
 import type { CompanionConfig, Game, GameDraft, GameRole, GameRoleId } from "../types";
 import ConfirmDialog from "../ui/ConfirmDialog";
+import { GamepadIcon, PlusIcon } from "../ui/icons";
 import GameDetail from "./GameDetail";
 import { AppPicker, RolePicker } from "./GamePickers";
 import { errorText, splitNames } from "./gameHelpers";
@@ -94,13 +95,29 @@ export default function GamesScreen({ navigate }: { navigate: (route: Route) => 
 
   const ready = companion?.consented;
   const roleLabel = (id: GameRoleId) => roles.find((role) => role.id === id)?.label ?? id;
+  const startAdding = () => {
+    setAdding(true);
+    api.getRunningApps().then(setRunning, () => undefined);
+  };
 
   return (
     <div className={styles.page}>
-      <p className={styles.lead}>
-        游戏是看屏时自动认出的场景：你让她看一眼时，她认出游戏就会带上这里的档案和知识回答，没见过的游戏会自动加进来。
-        让她一直陪着看时（设置里常开，或通话中说“这局陪我看着”），她按你选的角色陪着：战斗里不出声，只在间隙说话。
-      </p>
+      <ul className={`${ui.card} ${styles.how}`} aria-label="游戏场景怎么用">
+        <li>
+          <strong>看一眼</strong>
+          <span>
+            你让她看屏幕时，她认出游戏就会带上这里的档案和知识回答；没见过的游戏会自动加进来。
+          </span>
+        </li>
+        <li>
+          <strong>陪着看</strong>
+          <span>设置里常开，或通话中说“这局陪我看着”，她按你选的角色陪着玩。</span>
+        </li>
+        <li>
+          <strong>不打扰</strong>
+          <span>战斗里不出声，只在间隙说话；玩完可以写一段战报。</span>
+        </li>
+      </ul>
       {companion && !ready && (
         <div className={`${ui.card} ${styles.notice}`}>
           要她一直陪着看，需要先在设置「看屏 · 陪着看」里同意截图外发；只是让她看一眼不需要。
@@ -115,9 +132,29 @@ export default function GamesScreen({ navigate }: { navigate: (route: Route) => 
         </div>
       )}
 
+      <div className={ui.sectionHead}>
+        <h2 className={ui.sectionTitle}>你的游戏{games?.length ? ` · ${games.length}` : ""}</h2>
+        {!adding && games?.length ? (
+          <button type="button" className={`${ui.pill} ${ui.primary}`} onClick={startAdding}>
+            <PlusIcon size={15} />
+            添加游戏
+          </button>
+        ) : null}
+      </div>
+
       {games === null && <p className={ui.hint}>正在读取…</p>}
       {games?.length === 0 && !adding && (
-        <p className={ui.hint}>还没有游戏。先打开你要玩的游戏，再点下面的“添加游戏”。</p>
+        <div className={`${ui.card} ${styles.empty}`}>
+          <span className={styles.emptyIcon} aria-hidden="true">
+            <GamepadIcon size={26} />
+          </span>
+          <h3>还没有游戏</h3>
+          <p>让她看一眼正在玩的游戏，她会自己认出来并建档；也可以先打开游戏，再手动添加。</p>
+          <button type="button" className={`${ui.pill} ${ui.primary}`} onClick={startAdding}>
+            <PlusIcon size={15} />
+            添加游戏
+          </button>
+        </div>
       )}
 
       {games?.map((game) => (
@@ -220,20 +257,7 @@ export default function GamesScreen({ navigate }: { navigate: (route: Route) => 
             </button>
           </div>
         </section>
-      ) : (
-        <div className={styles.actions}>
-          <button
-            type="button"
-            className={`${ui.pill} ${ui.primary}`}
-            onClick={() => {
-              setAdding(true);
-              api.getRunningApps().then(setRunning, () => undefined);
-            }}
-          >
-            添加游戏
-          </button>
-        </div>
-      )}
+      ) : null}
 
       {deleting && (
         <ConfirmDialog

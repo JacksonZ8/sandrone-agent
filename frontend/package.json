@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "eslint src",
+    "test": "node --test tests/",
     "format": "prettier --write src",
     "format:check": "prettier --check src",
     "prepare": "cd .. && husky frontend/.husky"
@@ -15,6 +16,8 @@
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.3.0",
     "@fontsource/noto-serif-sc": "^5.3.0",
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0",
     "pixi-live2d-display": "^0.4.0",
     "pixi.js": "^6.5.10",
     "react": "^19.2.8",

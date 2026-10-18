@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 class CompanionConfigUpdate(BaseModel):
     enabled: bool | None = None
     consent: bool | None = None
-    allowed_apps: list[str] | None = Field(default=None, max_length=50)
+    hidden_apps: list[str] | None = Field(default=None, max_length=80)
     interval_minutes: int | None = Field(default=None, ge=2, le=60)
     remark_gap_minutes: int | None = Field(default=None, ge=0, le=600)
     notify: bool | None = None
@@ -19,7 +19,8 @@ class CompanionConfigUpdate(BaseModel):
 
 class CompanionConfigPublic(BaseModel):
     enabled: bool
-    allowed_apps: list[str]
+    hidden_apps: list[str]
+    always_hidden_apps: list[str]
     interval_minutes: int
     remark_gap_minutes: int
     notify: bool

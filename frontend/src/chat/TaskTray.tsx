@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
-import type { AgentTask, CodexThread } from "../types";
+import type { AgentLive, AgentTask, AgentWorkspace, CodexThread } from "../types";
 import ui from "../ui/ui.module.css";
 import styles from "./TaskTray.module.css";
+import TerminalPanel from "./TerminalPanel";
 
 interface Props {
   /** 变化时立刻重新读取（她刚给出或处理了一张任务卡、一轮对话结束） */
@@ -13,7 +14,13 @@ const ACTIVE_POLL_MS = 4000;
 const IDLE_POLL_MS = 30000;
 const SHOW_FINISHED_MS = 30 * 60 * 1000;
 
-const EXECUTOR: Record<AgentTask["command"], string> = { codex: "Codex", claude: "Claude Code" };
+const LIVE_POLL_MS = 1500;
+const TOOL_STATUS: Record<string, string> = {
+  pending: "…",
+  in_progress: "…",
+  completed: "✓",
+  failed: "✗",
+};
 
 function errorText(caught: unknown): string {
   return caught instanceof Error ? caught.message : String(caught);
@@ -24,7 +31,7 @@ function isActive(task: AgentTask): boolean {
 }
 
 function visible(task: AgentTask, now: number): boolean {
-  if (isActive(task)) return true;
+  if (isActive(task) || task.workspace) return true; // 改动还没合并或丢弃的卡一直留着
   if (task.status === "expired" || task.status === "cancelled") return false;
   const finished = task.finished_at ? Date.parse(task.finished_at) : 0;
   return now - finished < SHOW_FINISHED_MS;
@@ -126,6 +133,14 @@ export default function TaskTray({ signal }: Props) {
           onThread={(threadId) =>
             void act(task.id, () => api.setAgentTaskThread(task.id, threadId))
           }
+          onPermission={(optionId) =>
+            void act(task.id, () => api.answerAgentPermission(task.id, optionId))
+          }
+          onWorkspace={(action) => {
+            if (action === "discard" && !window.confirm("丢弃这次的全部改动？丢弃后找不回来。"))
+              return;
+            void act(task.id, () => api.resolveAgentWorkspace(task.id, action));
+          }}
           onDismiss={() => setDismissed((current) => [...current, task.id])}
         />
       ))}
@@ -145,10 +160,22 @@ interface CardProps {
   onConfirm: () => void;
   onCancel: () => void;
   onThread: (threadId: string) => void;
+  onPermission: (optionId: string) => void;
+  onWorkspace: (action: "merge" | "discard") => void;
   onDismiss: () => void;
 }
 
-function TaskCard({ task, now, busy, onConfirm, onCancel, onThread, onDismiss }: CardProps) {
+function TaskCard({
+  task,
+  now,
+  busy,
+  onConfirm,
+  onCancel,
+  onThread,
+  onPermission,
+  onWorkspace,
+  onDismiss,
+}: CardProps) {
   const proposed = task.status === "proposed";
   const running = task.status === "running";
   return (
@@ -163,7 +190,7 @@ function TaskCard({ task, now, busy, onConfirm, onCancel, onThread, onDismiss }:
           <span className={task.permission === "write" ? ui.tagAccent : ui.tag}>
             {task.permission === "write" ? "可写入" : "只读"}
           </span>
-          <span className={ui.tag}>{EXECUTOR[task.command]}</span>
+          <span className={ui.tag}>{task.agent_label}</span>
           <span className={ui.hint}>
             {running ? `执行中 · ${elapsedLabel(task.confirmed_at, now)}` : task.status_label}
           </span>
@@ -194,7 +221,12 @@ function TaskCard({ task, now, busy, onConfirm, onCancel, onThread, onDismiss }:
         <p className={styles.pre}>{task.prompt}</p>
       </details>
 
-      {proposed && <ThreadPicker task={task} busy={busy} onPick={onThread} />}
+      {proposed && (task.command === "claude" || task.command === "codex") && (
+        <ThreadPicker task={task} busy={busy} onPick={onThread} />
+      )}
+
+      {running && task.live && <LivePanel task={task} busy={busy} onPermission={onPermission} />}
+      {running && task.terminal && <TerminalPanel taskId={task.id} label={task.agent_label} />}
 
       {(task.status === "completed" ||
         task.status === "failed" ||
@@ -207,10 +239,14 @@ function TaskCard({ task, now, busy, onConfirm, onCancel, onThread, onDismiss }:
         </details>
       )}
 
+      {task.workspace && (
+        <WorkspacePanel workspace={task.workspace} busy={busy} onResolve={onWorkspace} />
+      )}
+
       <div className={styles.actions}>
         {task.codex_url && !proposed && (
           <a className={ui.pill} href={task.codex_url}>
-            在 Codex 中打开
+            在 ChatGPT 中打开
           </a>
         )}
         {proposed && (
@@ -233,7 +269,7 @@ function TaskCard({ task, now, busy, onConfirm, onCancel, onThread, onDismiss }:
             {busy ? "停止中…" : "停止"}
           </button>
         )}
-        {!proposed && !running && (
+        {!proposed && !running && !task.workspace && (
           <button type="button" className={ui.pill} onClick={onDismiss}>
             收起
           </button>
@@ -296,5 +332,138 @@ function ThreadPicker({ task, busy, onPick }: PickerProps) {
       )}
       <p className={ui.hint}>● 表示两分钟内刚在 App 里更新过，可能还在跑。</p>
     </details>
+  );
+}
+
+interface LiveProps {
+  task: AgentTask;
+  busy: boolean;
+  onPermission: (optionId: string) => void;
+}
+
+/** 执行中的实时过程：计划、工具调用、正在写的回复，以及等你决定的权限请求。 */
+function LivePanel({ task, busy, onPermission }: LiveProps) {
+  const [live, setLive] = useState<AgentLive | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = () =>
+      api.getAgentTaskLive(task.id).then(
+        (result) => !cancelled && setLive(result.live),
+        () => undefined,
+      );
+    void load();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load();
+    }, LIVE_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [task.id]);
+
+  if (!live) return <p className={ui.hint}>正在连上 {task.agent_label}…</p>;
+  const pending = live.pending_permission;
+  const tools = live.tools.slice(-6);
+  const denied = live.events.filter((event) => event.kind === "denied").slice(-2);
+
+  return (
+    <div className={styles.live} aria-live="polite">
+      {pending && (
+        <div className={styles.permission} role="alert">
+          <strong>
+            {task.agent_label} 想：{pending.title}
+          </strong>
+          <div className={styles.actions}>
+            {pending.options.map((option) => (
+              <button
+                key={option.optionId}
+                type="button"
+                className={`${ui.pill} ${option.kind.startsWith("allow") ? ui.primary : ""}`}
+                onClick={() => onPermission(option.optionId)}
+                disabled={busy}
+              >
+                {option.name}
+              </button>
+            ))}
+          </div>
+          <p className={ui.hint}>10 分钟没回复就按拒绝处理。</p>
+        </div>
+      )}
+      {live.plan.length > 0 && (
+        <ol className={styles.plan}>
+          {live.plan.map((entry, index) => (
+            <li key={index} data-status={entry.status}>
+              {entry.content}
+            </li>
+          ))}
+        </ol>
+      )}
+      {tools.length > 0 && (
+        <ul className={styles.tools}>
+          {tools.map((tool) => (
+            <li key={tool.id}>
+              <span aria-hidden="true">{TOOL_STATUS[tool.status] ?? "·"}</span> {tool.title}
+            </li>
+          ))}
+        </ul>
+      )}
+      {denied.map((event) => (
+        <p key={event.at} className={ui.hint}>
+          {event.text}
+        </p>
+      ))}
+      {live.text && <p className={styles.pre}>{live.text.slice(-600)}</p>}
+    </div>
+  );
+}
+
+interface WorkspaceProps {
+  workspace: AgentWorkspace;
+  busy: boolean;
+  onResolve: (action: "merge" | "discard") => void;
+}
+
+/** 写入任务在独立工作区里的改动：看过再合并进你的分支，或丢弃。 */
+function WorkspacePanel({ workspace, busy, onResolve }: WorkspaceProps) {
+  const target = workspace.target_branch || "当前分支";
+  return (
+    <div className={styles.workspace}>
+      <div className={styles.workspaceHead}>
+        <strong>
+          {workspace.files.length ? `改了 ${workspace.files.length} 个文件` : "还没有改动"}
+        </strong>
+        <span className={ui.hint}>在独立工作区里，合并前不会碰你的目录</span>
+      </div>
+      {workspace.files.length > 0 && (
+        <>
+          <pre className={styles.diff}>{workspace.stat}</pre>
+          <details className={styles.more}>
+            <summary>看完整改动</summary>
+            <pre className={styles.diff}>{workspace.diff}</pre>
+          </details>
+        </>
+      )}
+      <div className={styles.actions}>
+        <button
+          type="button"
+          className={ui.pill}
+          onClick={() => onResolve("discard")}
+          disabled={busy}
+        >
+          丢弃改动
+        </button>
+        {workspace.files.length > 0 && (
+          <button
+            type="button"
+            className={`${ui.pill} ${ui.primary}`}
+            onClick={() => onResolve("merge")}
+            disabled={busy}
+          >
+            {busy ? "处理中…" : `合并到 ${target}`}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

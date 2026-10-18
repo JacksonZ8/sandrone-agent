@@ -1,0 +1,79 @@
+/* 设置页：吸顶的分区导航（玻璃胶囊条，可横向滑动）与分区之间的留白 */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0 -4px;
+  padding: 4px;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-radius: var(--radius-pill);
+  background: rgba(var(--glass-rgb), calc(var(--glass-alpha) + 0.12));
+  box-shadow:
+    inset 0 0 0 1px var(--ring),
+    0 6px 20px rgba(20, 35, 50, 0.08);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+}
+
+.nav::-webkit-scrollbar {
+  display: none;
+}
+
+.navItem {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 14px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--ink-2);
+  font-size: 13px;
+  white-space: nowrap;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.navItem:hover {
+  color: var(--ink);
+}
+
+.navItem[aria-current="true"] {
+  background: var(--knob);
+  color: var(--accent-ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+/* 只有一张卡的分区：卡片自己的标题与分区标题重复，收起 */
+.sections section > :global(.settings-card):nth-child(2):last-child > h3 {
+  display: none;
+}
+
+/* “高级”分区：默认收起，展开后是各项细节卡片 */
+.advanced > summary {
+  cursor: pointer;
+  width: fit-content;
+  padding: 6px 0;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.advanced > summary:hover {
+  color: var(--ink);
+}
+
+.advancedCards {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}

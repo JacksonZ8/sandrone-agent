@@ -16,16 +16,16 @@
 .column {
   width: min(100% - 24px, 720px);
   margin: 0 auto;
-  padding: 6px 0 16px;
+  padding: 6px 0 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .day {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .day > * {
@@ -33,12 +33,39 @@
   contain-intrinsic-size: auto 120px;
 }
 
+/* 日期分隔：细线中间一行小字，不再是一颗玻璃药丸 */
 .dayChip {
-  align-self: center;
-  padding: 2px 12px;
-  border-radius: var(--radius-pill);
+  margin: 6px 0 -2px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   font-size: 12px;
-  color: var(--ink-2);
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  content-visibility: visible;
+}
+
+.dayChip::before,
+.dayChip::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--line) 30%, var(--line) 70%, transparent);
+}
+
+/* 任务卡是她递过来的：与她的消息同列对齐 */
+.tasks {
+  padding-left: 44px;
+}
+
+.tasks:empty {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  .tasks {
+    padding-left: 0;
+  }
 }
 
 .older {
@@ -71,7 +98,20 @@
 }
 
 .dock {
+  position: relative;
   width: min(100% - 24px, 720px);
   margin: 0 auto;
-  padding-bottom: max(14px, env(safe-area-inset-bottom));
+  padding: 6px 0 max(14px, env(safe-area-inset-bottom));
+}
+
+/* 时间线从输入框上沿淡出，而不是被一刀切开 */
+.dock::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 18px;
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(var(--glass-rgb), 0.14), transparent);
 }

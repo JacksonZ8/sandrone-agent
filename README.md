@@ -12,10 +12,11 @@ A local-first companion agent with a single continuous timeline, human-like long
 - **类人长期记忆**：关于你 / 关于她自己 / 我们之间三个视角，对话后异步提取；检索按字面与意思（可选本地中文向量模型）匹配；遗忘曲线、情绪显著度、记忆联想（1–2 跳）、日记反思与记忆整理；每条回复可展开查看她实际唤起了哪些记忆。API Key 与微信 token 在数据库里加密存放（主密钥在 macOS 钥匙串，其他系统在 `data/secret.key`）；数据库每天自动备份，后端日志写进 `data/logs/`。
 - **关系与人设**：好感度、熟悉度、信任度随对话变化，人设随阶段软化；她有连续的情绪、精力与专注状态。
 - **实时语音通话**：本地 sherpa-onnx 流式识别 + Silero VAD + Smart Turn v3 语义断句，LLM 流式回复逐句交给本地 GPT-SoVITS 流式合成；可随时打断。音色需自备（见 [`assets/tts/README.md`](assets/tts/README.md)）。
-- **形象**：可选 Cubism Live2D 模型或逐帧形象包，口型跟随实时音量、表情跟随情绪标签；没有素材时显示剪影（见 [`docs/live2d.md`](docs/live2d.md)、[`docs/character.md`](docs/character.md)）。
+- **形象**：可选 Cubism Live2D 模型或逐帧形象包，口型跟随实时音量、表情跟随情绪标签；有形象包时通话里是类 Live2D 的网格形变（视线跟随鼠标、呼吸、情绪动作）；没有素材时显示剪影（见 [`docs/live2d.md`](docs/live2d.md)、[`docs/character.md`](docs/character.md)）。
 - **手机 App（PWA）**：经 Tailscale Serve 的 HTTPS 远程访问，只放行白名单 tailnet 账号；可接收她主动发来的消息推送（见 [`docs/pwa.md`](docs/pwa.md)）。
 - **微信私聊与主动消息**（可选）：腾讯 iLink Bot 协议，一次性配对码绑定主人；主动消息默认关闭，开启后她每天在随机时间决定要不要找你说话（见 [`docs/wechat_integration.md`](docs/wechat_integration.md)）。
-- **工具**：只读文件（目录白名单、拒绝凭据类文件）、网页搜索与读网页（仿 Claude Code 的 WebSearch/WebFetch：先找来源再只依据网页作答，默认 DuckDuckGo）、Claude Code / Codex CLI 子代理（默认关闭；先给任务卡，确认后后台执行并通知，可续接同一会话）。
+- **工具**：只读文件（打开后可读主目录，资源库、隐藏文件夹与她自己的数据永远不读，拒绝凭据类文件）、网页搜索与读网页（仿 Claude Code 的 WebSearch/WebFetch：先找来源再只依据网页作答，默认 DuckDuckGo）。
+- **智能体中枢**（默认关闭）：把任务派给这台电脑上的 Claude Code、Codex（任务也出现在 ChatGPT 桌面版里）、OpenCode、Hermes——统一走 ACP（Agent Client Protocol），过程实时显示在任务卡上，要权限时在卡上问你；Oh-DSH 在任务卡上的真终端里跑。Claude Code 与 OpenCode 在 sandbox-runtime 沙盒里、Codex 用它自己的权限配置，都读不到私密目录；写入任务在独立的 git 工作区里改，你看过改动再合并或丢弃；先给任务卡，确认后后台执行，做完她读结果用自己的话告诉你（见 [`docs/tools_design.md`](docs/tools_design.md)）。
 - **看屏**（只读）：**看一眼**为主——你让她看时截一次图当场回答；**陪着看**可在设置里常开，或聊天/通话中说“这局陪我看着”临时开一段时间（只看当前前台的应用，到点自动停），画面变化才调视觉模型，截图不落盘，首次陪着看需同意截图外发。**游戏是看屏时自动识别的场景**：认出游戏时带上账号档案与可分享的**游戏知识**（规则与高手打法，[`knowledge/games/`](knowledge/games/README.md)，不含个人信息），没建档的游戏自动加进「游戏」页；陪着看时按你选的陪玩角色（记录员/安静观众/搭子/教练）只在间隙说话、玩完写战报，并维护分游戏长期记忆（见 [`docs/screen_companion.md`](docs/screen_companion.md)）。会动键鼠的“帮你操作电脑”不在本仓库。
 - **回复速度**：网页对话流式显示；回复时的推理可在设置里选（默认自动：平时关闭，要查资料/读文件/看屏幕时开低）；每轮会变的上下文放在对话历史之后，以提高模型服务的前缀缓存命中；游戏记账在回复后的后台进行。
 - **API 用量**：按时间、Provider 与用途查看调用次数、Token、延迟和脱敏错误。
@@ -97,23 +98,21 @@ scripts/check.sh
 
 ## 首次配置
 
-1. 打开「设置」。
-2. Provider 选择 `DeepSeek`。
-3. 填写 Base URL（默认 `https://api.deepseek.com`）与 Model（默认 `deepseek-v4-flash`）。
-4. 填写 API Key，先点「测试连接」，再「保存配置」。
+1. 打开「设置」，Provider 选 `DeepSeek`，填 API Key，先点「测试连接」，再「保存配置」。地址、模型、回复思考等在「高级」里，一般不用动。
+2. 在「她能做什么」里打开想要的能力：读你的文件、看一眼屏幕、陪着你看、主动找你（上网查资料一直开着）。每项一个开关，打开即生效，不需要填目录或应用名单。
+3. 想让她主动发微信：在「微信」里扫码登录并用配对码绑定。
+4. 额外文件夹（主目录以外）、不看的应用、看屏频率、主动消息的节奏、视觉模型、搜索服务和子代理都在「高级」里。
 5. 没有 Key 时可临时选择「本地 Mock（无 Key 联调）」验证完整链路。
 
-API Key 只保存在本机 SQLite 中，接口只回传掩码和后 4 位。
+API Key 加密保存在本机 SQLite 中，接口只回传掩码和后 4 位。
 
-## 首次配置
+让她把任务派给这台电脑上的智能体（「高级」里的子代理）还需要它们的 ACP 接入程序和沙盒：
 
-1. 打开「设置」。
-2. Provider 选择 `DeepSeek`。
-3. 填写 Base URL（默认 `https://api.deepseek.com`）与 Model（默认 `deepseek-v4-flash`）。
-4. 填写 API Key，先点「测试连接」，再「保存配置」。
-5. 没有 Key 时可临时选择「本地 Mock（无 Key 联调）」验证完整链路。
+```bash
+npm install -g @agentclientprotocol/claude-agent-acp @agentclientprotocol/codex-acp opencode-ai @anthropic-ai/sandbox-runtime
+```
 
-API Key 只保存在本机 SQLite 中，接口只回传掩码和后 4 位。
+Codex 会用 ChatGPT 桌面版自带的 codex；Hermes 自带 `hermes-acp`（先 `hermes model` 选好模型）；Oh-DSH 用桌面版自带的终端界面。
 
 ## 双主体记忆
 
@@ -165,7 +164,7 @@ API Key 只保存在本机 SQLite 中，接口只回传掩码和后 4 位。
 | PUT | `/api/llm-config` | 保存 LLM 配置 |
 | POST | `/api/llm-config/test` | 测试连接 |
 | GET | `/api/tools/files/config` | 文件工具配置 |
-| PUT | `/api/tools/files/config` | 更新目录白名单 |
+| PUT | `/api/tools/files/config` | 读文件开关与主目录以外的额外文件夹 |
 | POST | `/api/tools/files/read` | 只读读取文件 |
 | GET | `/api/tools/search/config` | 搜索工具配置 |
 | POST | `/api/tools/search` | 网页搜索 |
@@ -173,7 +172,7 @@ API Key 只保存在本机 SQLite 中，接口只回传掩码和后 4 位。
 | PUT | `/api/tools/screen/config` | 更新视觉模型配置 |
 | POST | `/api/tools/screen/analyze` | 截屏并分析 |
 | GET/PUT | `/api/companion/config` | 看屏 · 陪着看的配置（同意截图外发需 `consent: true`，`stop_watch: true` 结束语音临时开） |
-| POST | `/api/companion/check` | 立刻看一眼名单内窗口 |
+| POST | `/api/companion/check` | 立刻看一眼她可以看的窗口 |
 | GET/DELETE | `/api/companion/observations` | 她看到的概括 / 清除 |
 | GET/POST | `/api/games` | 游戏档案列表 / 添加（必须选陪玩角色） |
 | GET/PUT/DELETE | `/api/games/{id}` | 游戏详情（含账号档案、别名）/ 修改 / 删除 |

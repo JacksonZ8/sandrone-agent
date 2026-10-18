@@ -47,6 +47,9 @@ from .wechat import (
     WeChatSendResponse,
 )
 from .tools import (
+    AgentAvailability,
+    AgentPermissionAnswer,
+    AgentWorkspacePublic,
     FileToolConfig,
     FileToolConfigUpdate,
     FileReadRequest,

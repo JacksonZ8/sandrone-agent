@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CALL_ENDED_EVENT, nativeCallWindow, postNative } from "../app/native";
 import { usePrefs } from "../prefs/prefs";
 import CallView from "../stage/CallView";
 import { useVoiceCall } from "../voice/useVoiceCall";
@@ -9,6 +10,7 @@ import ui from "../ui/ui.module.css";
 import styles from "./ChatScreen.module.css";
 import Composer from "./Composer";
 import { dayLabel } from "./format";
+import { groupTimeline } from "./grouping";
 import LiveStatus from "./LiveStatus";
 import MessageItem from "./MessageItem";
 import TaskTray from "./TaskTray";
@@ -19,23 +21,6 @@ import { useVoice } from "./useVoice";
 interface Props {
   appState: AppState | null;
   onStateChange: () => void;
-}
-
-interface DayGroup {
-  day: string;
-  items: { message: Message; initiated: boolean }[];
-}
-
-function groupByDay(messages: Message[]): DayGroup[] {
-  const groups: DayGroup[] = [];
-  messages.forEach((message) => {
-    const initiated = message.role === "assistant" && Boolean(message.initiated);
-    const day = dayLabel(message.created_at);
-    const last = groups[groups.length - 1];
-    if (!last || last.day !== day) groups.push({ day, items: [{ message, initiated }] });
-    else last.items.push({ message, initiated });
-  });
-  return groups;
 }
 
 export default function ChatScreen({ appState, onStateChange }: Props) {
@@ -99,7 +84,7 @@ export default function ChatScreen({ appState, onStateChange }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [lastId, stream.sending, stream.events.length, stream.partial.length]);
 
-  const groups = useMemo(() => groupByDay(timeline.messages), [timeline.messages]);
+  const groups = useMemo(() => groupTimeline(timeline.messages, dayLabel), [timeline.messages]);
 
   const replyOptions = useMemo(
     () => ({
@@ -157,6 +142,8 @@ export default function ChatScreen({ appState, onStateChange }: Props) {
   const { start: startCall, stop: stopCall } = call;
   const openCall = useCallback(() => {
     stopVoice();
+    // macOS App 里由原生壳接通：隐藏对话窗口与桌宠，弹出桌面通话窗口
+    if (nativeCallWindow() && postNative({ type: "call" })) return;
     setCalling(true);
     void startCall();
   }, [startCall, stopVoice]);
@@ -165,6 +152,17 @@ export default function ChatScreen({ appState, onStateChange }: Props) {
     setCalling(false);
     onStateChange();
   }, [onStateChange, stopCall]);
+
+  // 桌面通话结束后对话窗口回到前台：立刻读进通话里的几轮对话
+  const { refresh } = timeline;
+  useEffect(() => {
+    const onEnded = () => {
+      refresh();
+      onStateChange();
+    };
+    window.addEventListener(CALL_ENDED_EVENT, onEnded);
+    return () => window.removeEventListener(CALL_ENDED_EVENT, onEnded);
+  }, [onStateChange, refresh]);
   const needsConfig =
     appState && appState.provider !== "mock" && !appState.has_api_key
       ? "尚未配置 API Key：到「她的资料 → 模型、微信与工具」里填写。"
@@ -203,12 +201,16 @@ export default function ChatScreen({ appState, onStateChange }: Props) {
 
           {groups.map((group) => (
             <section key={group.day} className={styles.day} aria-label={group.day}>
-              <div className={`${ui.glass} ${styles.dayChip}`}>{group.day}</div>
-              {group.items.map(({ message, initiated }) => (
+              <div className={styles.dayChip}>
+                <span>{group.day}</span>
+              </div>
+              {group.items.map(({ message, initiated, continued }) => (
                 <MessageItem
                   key={message.id}
                   message={message}
                   initiated={initiated}
+                  continued={continued}
+                  latest={message.id === lastId && !stream.sending}
                   showActions={prefs.actionText}
                   voiceReady={voiceReady}
                   synthesizing={busyIds.includes(message.id)}
@@ -230,7 +232,9 @@ export default function ChatScreen({ appState, onStateChange }: Props) {
               partial={stream.partial}
             />
           )}
-          <TaskTray signal={taskSignal} />
+          <div className={styles.tasks}>
+            <TaskTray signal={taskSignal} />
+          </div>
           {error && (
             <div className={ui.error} role="alert">
               {error}

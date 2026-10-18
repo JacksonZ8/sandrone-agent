@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 本地检查入口（仓库暂无远端 CI）：隔离的后端测试、应用导入、前端 Lint 与构建、Git 禁入项扫描。
+# 本地检查入口（仓库暂无远端 CI）：隔离的后端测试、应用导入、前端 Lint、单元测试与构建、Git 禁入项扫描。
 # 用法：scripts/check.sh [--skip-frontend]
 set -euo pipefail
 
@@ -40,9 +40,9 @@ say "后端应用导入"
 (cd "$BACKEND_DIR" && .venv/bin/python -c "import app.main")
 
 if [ "$SKIP_FRONTEND" -eq 0 ]; then
-  say "前端 Lint、类型检查与构建"
+  say "前端 Lint、单元测试、类型检查与构建"
   [ -d "$FRONTEND_DIR/node_modules" ] || fail "缺少 frontend/node_modules，请先运行 npm install。"
-  (cd "$FRONTEND_DIR" && npm run lint --silent && npm run build --silent)
+  (cd "$FRONTEND_DIR" && npm run lint --silent && npm test --silent && npm run build --silent)
 fi
 
 say "Git 空白与禁入项"

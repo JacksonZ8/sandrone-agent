@@ -332,13 +332,14 @@ class PushSubscription(SQLModel, table=True):
 
 
 class ScreenCompanionConfig(SQLModel, table=True):
-    """看屏 · 陪着看：只读、低频地看名单内应用的窗口。常开默认关闭；也可以语音临时开一段时间。首次需用户同意截图外发。"""
+    """看屏 · 陪着看：只读、低频地看你正在用的应用窗口（不看的应用除外）。常开默认关闭；也可以语音临时开一段时间。首次需用户同意截图外发。"""
 
     __tablename__ = "screen_companion_config"
 
     id: int = Field(default=1, primary_key=True)
     enabled: bool = Field(default=False)
-    allowed_apps: str = Field(default="[]")  # JSON 数组，应用名与 macOS 窗口所属应用名一致
+    allowed_apps: str = Field(default="[]")  # 旧版的“可以看的应用”名单，已不再使用（改为下面的不看名单）
+    hidden_apps: str = Field(default="")  # JSON 数组：她不看的应用（可编辑部分）；空串表示用默认名单
     interval_minutes: int = Field(default=5)
     remark_gap_minutes: int = Field(default=45)  # 两次开口的最短间隔；0 表示只看不说
     notify: bool = Field(default=True)  # 开口时同时弹系统通知

@@ -49,7 +49,11 @@ export default function WeChatSettingsCard({ onConfigSaved }: Props) {
         try {
           const status = await api.pollWeChatLogin(login.qrcode);
           setWxLoginMessage(status.message);
-          if (status.status === "confirmed" || status.status === "expired" || status.status === "error") {
+          if (
+            status.status === "confirmed" ||
+            status.status === "expired" ||
+            status.status === "error"
+          ) {
             if (wxPollTimer.current) window.clearInterval(wxPollTimer.current);
             wxPollTimer.current = null;
             if (status.status === "confirmed") {
@@ -133,12 +137,18 @@ export default function WeChatSettingsCard({ onConfigSaved }: Props) {
       ) : (
         <>
           <div className="wechat-status">
-            <span className={`status ${wechat?.status === "connected" ? "status-ready" : "status-warning"}`}>
+            <span
+              className={`status ${wechat?.status === "connected" ? "status-ready" : "status-warning"}`}
+            >
               <span className="status-dot" />
             </span>
             <div>
               <div>
-                {wechat?.enabled ? (wechat.status === "connected" ? "已连接" : wechat.status) : "未连接"}
+                {wechat?.enabled
+                  ? wechat.status === "connected"
+                    ? "已连接"
+                    : wechat.status
+                  : "未连接"}
                 {wechat?.owner_paired ? " · 已绑定你的微信" : ""}
               </div>
               {wechat?.account_id_masked && <p>账号：{wechat.account_id_masked}</p>}
@@ -156,18 +166,35 @@ export default function WeChatSettingsCard({ onConfigSaved }: Props) {
                 <div className="form-grid wechat-manual">
                   <label className="field">
                     <span>account_id</span>
-                    <input value={wxAccountInput} onChange={(event) => setWxAccountInput(event.target.value)} placeholder="ilink_bot_id" />
+                    <input
+                      value={wxAccountInput}
+                      onChange={(event) => setWxAccountInput(event.target.value)}
+                      placeholder="ilink_bot_id"
+                    />
                   </label>
                   <label className="field">
                     <span>token</span>
-                    <input type="password" value={wxTokenInput} onChange={(event) => setWxTokenInput(event.target.value)} placeholder="bot_token" />
+                    <input
+                      type="password"
+                      value={wxTokenInput}
+                      onChange={(event) => setWxTokenInput(event.target.value)}
+                      placeholder="bot_token"
+                    />
                   </label>
                   <label className="field">
                     <span>你的微信 ID（可选，留空则连接后用配对码绑定）</span>
-                    <input value={wxOwnerInput} onChange={(event) => setWxOwnerInput(event.target.value)} placeholder="owner_user_id" />
+                    <input
+                      value={wxOwnerInput}
+                      onChange={(event) => setWxOwnerInput(event.target.value)}
+                      placeholder="owner_user_id"
+                    />
                   </label>
                 </div>
-                <button className="small-button primary" onClick={() => void saveWeChatConfig()} disabled={wxSaving}>
+                <button
+                  className="small-button primary"
+                  onClick={() => void saveWeChatConfig()}
+                  disabled={wxSaving}
+                >
                   {wxSaving ? "保存中…" : "保存并连接"}
                 </button>
               </details>
@@ -186,12 +213,14 @@ export default function WeChatSettingsCard({ onConfigSaved }: Props) {
           {wechat?.enabled && !wechat.owner_paired && (
             <div className="wechat-login">
               <p className="wechat-login-message">
-                尚未绑定主人：绑定前任何人的消息都不会交给桑多涅。生成配对码后，用你自己的微信把它发给 Bot。
+                尚未绑定主人：绑定前任何人的消息都不会交给桑多涅。生成配对码后，用你自己的微信把它发给
+                Bot。
               </p>
               {pairing ? (
                 <>
                   <p className="wechat-login-message">
-                    配对码 <code>{pairing.code}</code>，{Math.round(pairing.expires_in_seconds / 60)} 分钟内有效，只能使用一次。
+                    配对码 <code>{pairing.code}</code>，
+                    {Math.round(pairing.expires_in_seconds / 60)} 分钟内有效，只能使用一次。
                   </p>
                   <button className="small-button" onClick={() => void refreshPairing()}>
                     我已发送，刷新状态

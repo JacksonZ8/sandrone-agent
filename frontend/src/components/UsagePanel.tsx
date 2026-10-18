@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import ui from "../ui/ui.module.css";
 import type { UsageRange, UsageSummary } from "../types";
 import UsageBreakdowns from "./usage/UsageBreakdowns";
 import UsageErrors from "./usage/UsageErrors";
@@ -48,12 +49,10 @@ export default function UsagePanel() {
   }, [range, provider, purpose, requestKey]);
 
   return (
-    <div className="usage-panel">
-      <div className="panel-head">
-        <div>
-          <p>本地聚合调用、Token、Provider、模型、延迟和脱敏错误；不展示原始日志。</p>
-        </div>
-      </div>
+    <div className={`${ui.page} usage-panel`}>
+      <p className={ui.pageLead}>
+        本地聚合调用、Token、Provider、模型、延迟和脱敏错误；不展示原始日志。
+      </p>
       <UsageFilters
         range={range}
         provider={provider}

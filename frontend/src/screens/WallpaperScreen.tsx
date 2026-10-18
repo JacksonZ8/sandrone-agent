@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import HerAvatar from "../character/HerAvatar";
 import { usePrefs, WALLPAPERS } from "../prefs/prefs";
 import { PlusIcon } from "../ui/icons";
 import ui from "../ui/ui.module.css";
@@ -22,9 +23,15 @@ export default function WallpaperScreen() {
   return (
     <div className={styles.page}>
       <div className={styles.previewArea}>
-        <div className={`${ui.card} ${ui.lifted} ${styles.preview}`} aria-label="预览">
-          <div className={ui.hint}>预览</div>
-          <div>这里清静，适合一个人做点研究。……你来的话，也不算打扰。</div>
+        {/* 预览：一小段对话，与对话页同样的头像、玻璃回复与强调色气泡 */}
+        <div className={styles.preview} aria-label="预览">
+          <div className={styles.herLine}>
+            <HerAvatar className={styles.avatar} />
+            <div className={`${ui.card} ${ui.lifted} ${styles.herBubble}`}>
+              这里清静，适合一个人做点研究。……你来的话，也不算打扰。
+            </div>
+          </div>
+          <div className={styles.myBubble}>那我就待一会儿。</div>
         </div>
       </div>
 

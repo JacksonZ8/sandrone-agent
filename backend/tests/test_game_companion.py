@@ -138,7 +138,7 @@ class GameModeTests(unittest.TestCase):
         self.engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
         SQLModel.metadata.create_all(self.engine)
         with Session(self.engine) as session:
-            session.add(ScreenCompanionConfig(id=1, enabled=True, allowed_apps='["Code"]', consent_at=datetime.now(timezone.utc)))
+            session.add(ScreenCompanionConfig(id=1, enabled=True, consent_at=datetime.now(timezone.utc)))
             session.add(ToolConfig(id=1, vision_api_key="test-key"))
             session.commit()
             game = create_game(session, {"name": "杀戮尖塔", "app_names": ["SlayTheSpire"], "role": "spectator"})

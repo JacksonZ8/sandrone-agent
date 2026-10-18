@@ -109,3 +109,92 @@
 .actions a {
   text-decoration: none;
 }
+
+/* 执行中的实时过程 */
+.live {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--track);
+  font-size: 13px;
+}
+
+.permission {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--tag);
+}
+
+.plan,
+.tools {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-2);
+}
+
+.plan li[data-status="completed"] {
+  text-decoration: line-through;
+}
+
+.tools {
+  list-style: none;
+  padding-left: 0;
+}
+
+.permission .actions {
+  justify-content: flex-start;
+}
+
+/* 终端类智能体的真终端 */
+.terminalWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.terminal {
+  height: 320px;
+  padding: 8px;
+  border-radius: var(--radius-control);
+  background: #1d2329;
+  overflow: hidden;
+}
+
+/* 写入任务在独立工作区里的改动 */
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--tag);
+  font-size: 13px;
+}
+
+.workspaceHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.workspace .actions {
+  justify-content: flex-start;
+}
+
+.diff {
+  margin: 6px 0 0;
+  max-height: 360px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
+}

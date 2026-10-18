@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import type { Memory, MemoryPerspective } from "../types";
 import ConfirmDialog from "../ui/ConfirmDialog";
-import { SearchIcon } from "../ui/icons";
+import { PencilIcon, SearchIcon, TrashIcon } from "../ui/icons";
 import ui from "../ui/ui.module.css";
 import styles from "./MemoryScreen.module.css";
 
@@ -20,10 +20,10 @@ const PERSPECTIVES: { key: MemoryPerspective; label: string }[] = [
   { key: "shared", label: "我们之间" },
 ];
 
-function strengthLabel(strength: number): { text: string; faded: boolean } {
-  if (strength >= 0.66) return { text: "常想起", faded: false };
-  if (strength >= 0.33) return { text: "偶尔想起", faded: false };
-  return { text: "渐渐淡忘", faded: true };
+function strengthLabel(strength: number): { text: string; faded: boolean; level: number } {
+  if (strength >= 0.66) return { text: "常想起", faded: false, level: 3 };
+  if (strength >= 0.33) return { text: "偶尔想起", faded: false, level: 2 };
+  return { text: "渐渐淡忘", faded: true, level: 1 };
 }
 
 function errorText(caught: unknown): string {
@@ -186,10 +186,32 @@ export default function MemoryScreen({ onMemoryChange }: { onMemoryChange: () =>
                 <span className={memory.type === "project" ? ui.tagAccent : ui.tag}>
                   {TYPE_LABELS[memory.type]}
                 </span>
-                <span>
+                <span className={styles.strength} data-level={strength.level}>
                   {strength.text}
                   {sources > 0 ? ` · 来自 ${sources} 段对话` : ""}
                 </span>
+                {editable && editing?.id !== memory.id && (
+                  <span className={styles.tools}>
+                    <button
+                      type="button"
+                      className={`${ui.iconButton} ${ui.small}`}
+                      aria-label="编辑这条记忆"
+                      title="编辑"
+                      onClick={() => setEditing({ id: memory.id, draft: memory.content })}
+                    >
+                      <PencilIcon size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      className={`${ui.iconButton} ${ui.small} ${styles.forget}`}
+                      aria-label="让她忘掉这件事"
+                      title="忘掉"
+                      onClick={() => setForgetting(memory)}
+                    >
+                      <TrashIcon size={16} />
+                    </button>
+                  </span>
+                )}
               </div>
               {editing?.id === memory.id ? (
                 <div className={styles.edit}>
@@ -226,27 +248,7 @@ export default function MemoryScreen({ onMemoryChange }: { onMemoryChange: () =>
                   </div>
                 </div>
               ) : (
-                <>
-                  <div className={styles.content}>{memory.content}</div>
-                  {editable && (
-                    <div className={styles.actions}>
-                      <button
-                        type="button"
-                        className={ui.pill}
-                        onClick={() => setEditing({ id: memory.id, draft: memory.content })}
-                      >
-                        编辑
-                      </button>
-                      <button
-                        type="button"
-                        className={`${ui.pill} ${ui.danger}`}
-                        onClick={() => setForgetting(memory)}
-                      >
-                        忘掉
-                      </button>
-                    </div>
-                  )}
-                </>
+                <div className={styles.content}>{memory.content}</div>
               )}
             </li>
           );

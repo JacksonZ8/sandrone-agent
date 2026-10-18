@@ -1,0 +1,151 @@
+/* 侧栏：她的名片 + 分组导航 + 连接状态。常驻与抽屉共用同一份内容。 */
+
+.sidebar {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: calc(14px + env(safe-area-inset-top)) 12px 14px;
+  overflow-y: auto;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.identity {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px 8px 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 18px;
+  color: inherit;
+  text-decoration: none;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.identity:hover {
+  background: var(--track);
+}
+
+.avatar {
+  composes: avatar from "../chat/MessageItem.module.css";
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  margin-top: 0;
+}
+
+.who {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.35;
+}
+
+.name {
+  font-family: var(--font-seal);
+  font-size: 17px;
+  color: var(--ink);
+}
+
+.status {
+  font-size: 12px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.groupTitle {
+  margin: 0 0 4px;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+}
+
+.item {
+  min-height: 42px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 14px;
+  color: var(--ink-2);
+  font-size: 14px;
+  text-decoration: none;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.item svg {
+  flex: 0 0 auto;
+  color: var(--ink-3);
+}
+
+.item:hover {
+  background: var(--track);
+  color: var(--ink);
+}
+
+.item[aria-current="page"] {
+  background: rgba(var(--glass-rgb), 0.72);
+  box-shadow:
+    inset 0 0 0 1px var(--ring),
+    0 2px 8px rgba(20, 35, 50, 0.08);
+  color: var(--accent-ink);
+}
+
+.item[aria-current="page"] svg {
+  color: var(--accent);
+}
+
+.foot {
+  margin-top: auto;
+  padding: 10px 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--line);
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  color: var(--accent);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.link::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+.link[data-online="true"]::before {
+  background: var(--ok);
+}

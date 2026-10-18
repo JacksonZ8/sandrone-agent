@@ -1,9 +1,5 @@
 .page {
-  width: min(100% - 28px, 720px);
-  margin: 0 auto;
-  padding-bottom: 32px;
-  display: flex;
-  flex-direction: column;
+  composes: page from "../ui/ui.module.css";
   gap: 10px;
 }
 
@@ -75,6 +71,7 @@
 }
 
 .item {
+  padding: 12px 14px 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -85,14 +82,82 @@
 }
 
 .meta {
+  min-height: 32px;
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: var(--ink-2);
+  color: var(--ink-3);
+}
+
+/* 记忆强度：三格小刻度，常想起满格、渐渐淡忘一格 */
+.strength {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.strength::before {
+  content: "";
+  width: 18px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0 30%,
+    transparent 30% 35%,
+    var(--accent) 35% 65%,
+    transparent 65% 70%,
+    var(--accent) 70%
+  );
+  opacity: 0.85;
+  -webkit-mask: linear-gradient(90deg, #000 var(--fill), rgba(0, 0, 0, 0.18) var(--fill));
+  mask: linear-gradient(90deg, #000 var(--fill), rgba(0, 0, 0, 0.18) var(--fill));
+}
+
+.strength[data-level="3"] {
+  --fill: 100%;
+}
+
+.strength[data-level="2"] {
+  --fill: 66%;
+}
+
+.strength[data-level="1"] {
+  --fill: 33%;
+}
+
+/* 编辑与忘掉：悬停、聚焦时出现；触屏一直显示 */
+.tools {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.item:hover .tools,
+.item:focus-within .tools {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .tools {
+    opacity: 1;
+  }
+}
+
+.tools button {
+  color: var(--ink-3);
+}
+
+.forget:hover {
+  color: var(--danger);
 }
 
 .content {
+  font-size: 14.5px;
+  line-height: 1.75;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

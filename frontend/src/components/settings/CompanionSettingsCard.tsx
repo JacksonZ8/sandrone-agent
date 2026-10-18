@@ -5,9 +5,9 @@ import type { CompanionConfig, CompanionObservation, CompanionStatus } from "../
 const STATE_LABELS: Record<CompanionStatus["state"], string> = {
   off: "未开启",
   paused: "已暂停",
-  not_allowed: "你现在用的应用不在名单里，她没有看",
+  not_allowed: "你现在用的应用在不看的名单里，她没有看",
   away: "你好像离开了，她没有看",
-  no_window: "没找到名单内应用的窗口",
+  no_window: "没找到她可以看的窗口",
   watching: "正在陪你",
   playing: "正在陪你玩",
   error: "出错了",
@@ -46,18 +46,30 @@ export default function CompanionSettingsCard() {
   const [observations, setObservations] = useState<CompanionObservation[]>([]);
   const [running, setRunning] = useState<string[]>([]);
   const [pick, setPick] = useState("");
-  const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
 
   async function refresh() {
     try {
-      const [nextStatus, nextObservations] = await Promise.all([
+      const [nextStatus, nextObservations, fresh] = await Promise.all([
         api.getCompanionStatus(),
         api.getCompanionObservations(8),
+        api.getCompanionConfig(),
       ]);
       setStatus(nextStatus);
       setObservations(nextObservations);
+      // 开关在“她能做什么”里改：只同步开关与同意状态，不冲掉这里没保存的编辑
+      setConfig((current) =>
+        current
+          ? {
+              ...current,
+              enabled: fresh.enabled,
+              consented: fresh.consented,
+              watch_until: fresh.watch_until,
+              watch_apps: fresh.watch_apps,
+            }
+          : current,
+      );
     } catch {
       // 状态刷新失败不影响设置。
     }
@@ -92,25 +104,21 @@ export default function CompanionSettingsCard() {
   if (!config) {
     return (
       <div className="settings-card">
-        <h3>看屏 · 陪着看</h3>
+        <h3>陪着看</h3>
         <div className="chat-hint">{notice || "正在读取设置…"}</div>
       </div>
     );
   }
 
-  const needsConsent = !config.consented;
   const watching = Boolean(config.watch_until && new Date(config.watch_until) > new Date());
-  const choices = running.filter((name) => !config.allowed_apps.includes(name));
+  const choices = running.filter((name) => !config.hidden_apps.includes(name));
   const paused = Boolean(config.paused_until && new Date(config.paused_until) > new Date());
 
   const save = () =>
     run(async () => {
-      if (config.enabled && needsConsent && !agree) throw new Error("常开前请先勾选同意。");
       setConfig(
         await api.updateCompanionConfig({
-          enabled: config.enabled,
-          consent: needsConsent && agree ? true : undefined,
-          allowed_apps: config.allowed_apps,
+          hidden_apps: config.hidden_apps,
           interval_minutes: config.interval_minutes,
           remark_gap_minutes: config.remark_gap_minutes,
           notify: config.notify,
@@ -136,19 +144,9 @@ export default function CompanionSettingsCard() {
 
   return (
     <div className="settings-card">
-      <h3>看屏 · 陪着看</h3>
-      <label className="field">
-        <span className="inline-check">
-          <input
-            type="checkbox"
-            checked={config.enabled}
-            onChange={(event) => setConfig({ ...config, enabled: event.target.checked })}
-          />
-          常开：一直陪着看名单内的应用和建过档的游戏（只读）
-        </span>
-      </label>
+      <h3>陪着看</h3>
       <p className="tool-hint">
-        {`每隔几分钟，如果你正在用她在看的应用、人在电脑前、画面有变化，她会截这个应用最前面的一个窗口（不是整个屏幕），缩放后发给视觉模型（${config.vision_model} · ${config.vision_base_url}）概括成一句话。`}
+        {`在“她能做什么”里打开“陪着你看”后：每隔几分钟，如果你正在用的应用不在下面的名单里、人在电脑前、画面有变化，她会截这个应用最前面的一个窗口（不是整个屏幕），缩放后发给视觉模型（${config.vision_model}）概括成一句话。`}
         {
           "截图只在内存里，不保存；概括保留 7 天，你们聊天时她会知道你在忙什么。多数时候她安静陪着，偶尔说一句。她不会操作键盘鼠标。"
         }
@@ -158,7 +156,7 @@ export default function CompanionSettingsCard() {
       </p>
       {!config.has_vision_key && (
         <p className="agent-warning">
-          还没有可用的视觉模型 Key，请先在“看屏 · 看一眼”或模型设置里填写。
+          还没有可用的视觉模型 Key：填好对话模型的 Key 即可复用，或在“视觉模型”里单独填写。
         </p>
       )}
       {watching && (
@@ -177,26 +175,13 @@ export default function CompanionSettingsCard() {
           </button>
         </div>
       )}
-      {needsConsent && (
-        <label className="field">
-          <span className="inline-check">
-            <input
-              type="checkbox"
-              checked={agree}
-              onChange={(event) => setAgree(event.target.checked)}
-            />
-            我同意她陪着看时把窗口截图发给上面的视觉模型服务（常开和语音临时开都需要这一步）
-          </span>
-        </label>
-      )}
-
       <div className="field">
-        <span>她可以看的应用</span>
+        <span>她不看的应用</span>
         <div className="companion-apps">
-          {config.allowed_apps.length === 0 && (
-            <span className="tool-hint">还没有。名单为空时她什么都不看。</span>
+          {config.always_hidden_apps.length > 0 && (
+            <span className="tool-hint">永远不看：{config.always_hidden_apps.join("、")}</span>
           )}
-          {config.allowed_apps.map((name) => (
+          {config.hidden_apps.map((name) => (
             <button
               key={name}
               className="small-button"
@@ -204,7 +189,7 @@ export default function CompanionSettingsCard() {
               onClick={() =>
                 setConfig({
                   ...config,
-                  allowed_apps: config.allowed_apps.filter((item) => item !== name),
+                  hidden_apps: config.hidden_apps.filter((item) => item !== name),
                 })
               }
             >
@@ -225,15 +210,15 @@ export default function CompanionSettingsCard() {
             className="small-button"
             disabled={!pick}
             onClick={() => {
-              setConfig({ ...config, allowed_apps: [...config.allowed_apps, pick].sort() });
+              setConfig({ ...config, hidden_apps: [...config.hidden_apps, pick].sort() });
               setPick("");
             }}
           >
-            加入名单
+            不让她看
           </button>
         </div>
         <span className="tool-hint">
-          建议只放写代码、写文档、看资料这类应用；微信、邮箱、银行、密码管理器不要加。
+          除了这些，你正在用的应用她都可以看。银行等其他不想让她看的应用可以加进来。
         </span>
       </div>
 
@@ -336,7 +321,7 @@ export default function CompanionSettingsCard() {
       {notice && <div className="success-banner">{notice}</div>}
       <p className="tool-hint">
         需要后端有「屏幕录制」权限：系统设置 → 隐私与安全性 →
-        屏幕录制，允许启动后端的终端。设了名单时，你让她“看一眼”也只看名单内的窗口（前台是建过档的游戏除外）。
+        屏幕录制，允许启动后端的终端。屏幕上有她不看的应用时，“看一眼”也只截她能看的窗口。
       </p>
     </div>
   );

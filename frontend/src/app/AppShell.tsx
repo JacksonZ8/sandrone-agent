@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../api";
 import CharacterStage from "../stage/CharacterStage";
-import { BackIcon, CloseIcon, MenuIcon } from "../ui/icons";
+import { BackIcon, MenuIcon } from "../ui/icons";
 import ui from "../ui/ui.module.css";
 import styles from "./AppShell.module.css";
 import { PARENT, type Route } from "./route";
+import Sidebar from "./Sidebar";
 
 const TITLES: Record<Route, string> = {
   chat: "SANDRONE",
@@ -16,20 +17,12 @@ const TITLES: Record<Route, string> = {
   usage: "API 用量",
 };
 
-const NAV: { route: Route; label: string }[] = [
-  { route: "chat", label: "对话" },
-  { route: "her", label: "她的资料" },
-  { route: "memory", label: "她记得的事" },
-  { route: "games", label: "游戏" },
-  { route: "wallpaper", label: "壁纸与玻璃" },
-  { route: "settings", label: "模型、微信与工具" },
-  { route: "usage", label: "API 用量" },
-];
-
 interface Props {
   route: Route;
   navigate: (route: Route) => void;
   status: string;
+  /** 后端可达 */
+  online: boolean;
   children: ReactNode;
 }
 
@@ -64,7 +57,8 @@ function useWatchingApp(active: boolean): string {
   return active ? app : "";
 }
 
-export default function AppShell({ route, navigate, status, children }: Props) {
+/** 外壳：宽屏左侧常驻侧栏，窄屏顶栏菜单打开抽屉（同一份侧栏内容）。 */
+export default function AppShell({ route, navigate, status, online, children }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const drawerRef = useRef<HTMLElement | null>(null);
 
@@ -83,57 +77,62 @@ export default function AppShell({ route, navigate, status, children }: Props) {
 
   return (
     <div className={styles.shell}>
-      <header className={styles.header}>
-        {isChat ? (
-          <button
-            type="button"
-            className={ui.iconButton}
-            aria-label="菜单"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen(true)}
-          >
-            <MenuIcon size={20} />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className={ui.iconButton}
-            aria-label="返回"
-            onClick={() => navigate(PARENT[route])}
-          >
-            <BackIcon size={20} />
-          </button>
-        )}
-        <div className={styles.title}>
+      <aside className={styles.rail} aria-label="主菜单">
+        <Sidebar route={route} status={status} online={online} />
+      </aside>
+      <div className={styles.content}>
+        <header className={styles.header}>
           {isChat ? (
-            <>
-              <h1 className={styles.brand}>SANDRONE</h1>
-              <div className={styles.status}>
-                桑多涅 · {status}
-                {watching && <span title="她能看到这个应用的窗口"> · {watching}</span>}
-              </div>
-            </>
+            <button
+              type="button"
+              className={`${ui.iconButton} ${styles.narrowOnly}`}
+              aria-label="菜单"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen(true)}
+            >
+              <MenuIcon size={20} />
+            </button>
           ) : (
-            <h1 className={styles.pageTitle}>{TITLES[route]}</h1>
+            <button
+              type="button"
+              className={`${ui.iconButton} ${styles.narrowOnly}`}
+              aria-label="返回"
+              onClick={() => navigate(PARENT[route])}
+            >
+              <BackIcon size={20} />
+            </button>
           )}
-        </div>
-        {isChat ? (
-          <button
-            type="button"
-            className={styles.avatar}
-            aria-label="她的资料"
-            onClick={() => navigate("her")}
-          >
-            <CharacterStage size="avatar" label="" />
-          </button>
-        ) : (
-          <span className={styles.balance} aria-hidden="true" />
-        )}
-      </header>
+          <div className={styles.title}>
+            {isChat ? (
+              <>
+                <h1 className={styles.brand}>SANDRONE</h1>
+                <div className={styles.status}>
+                  桑多涅 · {status}
+                  {watching && <span title="她能看到这个应用的窗口"> · {watching}</span>}
+                </div>
+              </>
+            ) : (
+              <h1 className={styles.pageTitle}>{TITLES[route]}</h1>
+            )}
+          </div>
+          {isChat ? (
+            <button
+              type="button"
+              className={`${styles.avatar} ${styles.narrowOnly}`}
+              aria-label="她的资料"
+              onClick={() => navigate("her")}
+            >
+              <CharacterStage size="avatar" label="" />
+            </button>
+          ) : (
+            <span className={`${styles.balance} ${styles.narrowOnly}`} aria-hidden="true" />
+          )}
+        </header>
 
-      <main className={isChat ? styles.main : `${styles.main} ${styles.scrollable}`}>
-        {children}
-      </main>
+        <main className={isChat ? styles.main : `${styles.main} ${styles.scrollable}`}>
+          {children}
+        </main>
+      </div>
 
       {menuOpen && (
         <div className={styles.drawerScrim} onClick={() => setMenuOpen(false)}>
@@ -143,28 +142,13 @@ export default function AppShell({ route, navigate, status, children }: Props) {
             aria-label="主菜单"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className={styles.drawerHead}>
-              <span className={styles.brand}>SANDRONE</span>
-              <button
-                type="button"
-                className={ui.iconButton}
-                aria-label="关闭菜单"
-                onClick={() => setMenuOpen(false)}
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            {NAV.map((item) => (
-              <a
-                key={item.route}
-                href={`#/${item.route}`}
-                className={styles.navItem}
-                aria-current={route === item.route ? "page" : undefined}
-                onClick={() => setMenuOpen(false)}
-              >
-                {item.label}
-              </a>
-            ))}
+            <Sidebar
+              route={route}
+              status={status}
+              online={online}
+              onClose={() => setMenuOpen(false)}
+              onNavigate={() => setMenuOpen(false)}
+            />
           </nav>
         </div>
       )}

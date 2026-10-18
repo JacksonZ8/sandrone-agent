@@ -19,7 +19,12 @@ const REASON_LABELS: Record<string, string> = {
 
 function eventTime(iso: string): string {
   const date = new Date(iso.endsWith("Z") || iso.includes("+") ? iso : `${iso}Z`);
-  return date.toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleString("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export default function ProactiveSettingsCard() {
@@ -57,8 +62,8 @@ export default function ProactiveSettingsCard() {
     setNotice("");
     try {
       setConfig(
+        // 开关在“她能做什么”里，这里只存节奏
         await api.updateProactiveConfig({
-          enabled: config.enabled,
           daily_max: config.daily_max,
           quiet_start: config.quiet_start,
           quiet_end: config.quiet_end,
@@ -103,43 +108,45 @@ export default function ProactiveSettingsCard() {
 
   return (
     <div className="settings-card">
-      <h3>主动消息（微信）</h3>
+      <h3>主动找你的节奏</h3>
       {loading || !config ? (
         <div className="chat-hint">{notice || "正在读取主动消息设置…"}</div>
       ) : (
         <>
-          <label className="field">
-            <span className="inline-check">
-              <input
-                type="checkbox"
-                checked={config.enabled}
-                onChange={(event) => setConfig({ ...config, enabled: event.target.checked })}
-              />
-              允许她每天主动给你发微信
-            </span>
-          </label>
           <p className="chat-hint">
-            每天随机挑时间，由她自己决定说什么，或者那次干脆不说。安静时段、你们刚聊过、或上一条你还没回时不会打扰。需要后端保持运行，停机期间错过的时间不会补发。
+            在“她能做什么”里打开“主动找你”后生效：每天随机挑时间，由她自己决定说什么，或者那次干脆不说。安静时段、你们刚聊过、或上一条你还没回时不会打扰。需要后端保持运行，停机期间错过的时间不会补发。
           </p>
           <div className="form-grid">
             <label className="field">
               <span>每天最多</span>
               <select
                 value={config.daily_max}
-                onChange={(event) => setConfig({ ...config, daily_max: Number(event.target.value) })}
+                onChange={(event) =>
+                  setConfig({ ...config, daily_max: Number(event.target.value) })
+                }
               >
                 {[1, 2, 3, 4].map((value) => (
-                  <option key={value} value={value}>{value} 条</option>
+                  <option key={value} value={value}>
+                    {value} 条
+                  </option>
                 ))}
               </select>
             </label>
             <label className="field">
               <span>安静开始</span>
-              <input type="time" value={config.quiet_start} onChange={(event) => setConfig({ ...config, quiet_start: event.target.value })} />
+              <input
+                type="time"
+                value={config.quiet_start}
+                onChange={(event) => setConfig({ ...config, quiet_start: event.target.value })}
+              />
             </label>
             <label className="field">
               <span>安静结束</span>
-              <input type="time" value={config.quiet_end} onChange={(event) => setConfig({ ...config, quiet_end: event.target.value })} />
+              <input
+                type="time"
+                value={config.quiet_end}
+                onChange={(event) => setConfig({ ...config, quiet_end: event.target.value })}
+              />
             </label>
             <label className="field">
               <span>刚聊过多久内不打扰（分钟）</span>
@@ -148,7 +155,9 @@ export default function ProactiveSettingsCard() {
                 min={0}
                 max={1440}
                 value={config.min_idle_minutes}
-                onChange={(event) => setConfig({ ...config, min_idle_minutes: Number(event.target.value) })}
+                onChange={(event) =>
+                  setConfig({ ...config, min_idle_minutes: Number(event.target.value) })
+                }
               />
             </label>
           </div>
@@ -165,7 +174,8 @@ export default function ProactiveSettingsCard() {
           </div>
           {preview && (
             <p className="chat-hint">
-              预览（未发送）：{preview.send ? `「${preview.text}」` : "她这次选择不发。"}
+              预览（未发送）：
+              {preview.send ? `「${preview.text}」` : "她这次选择不发。"}
             </p>
           )}
           {events.length > 0 && (

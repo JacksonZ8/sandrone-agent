@@ -144,26 +144,6 @@ export default function LLMSettingsCard({ onConfigSaved }: Props) {
             </label>
 
             <label className="field">
-              <span>Base URL</span>
-              <input
-                value={baseUrl}
-                onChange={(event) => setBaseUrl(event.target.value)}
-                placeholder="https://api.deepseek.com"
-                disabled={provider === "mock"}
-              />
-            </label>
-
-            <label className="field">
-              <span>Model</span>
-              <input
-                value={model}
-                onChange={(event) => setModel(event.target.value)}
-                placeholder="deepseek-v4-flash"
-                disabled={provider === "mock"}
-              />
-            </label>
-
-            <label className="field">
               <span>API Key</span>
               <input
                 type="password"
@@ -183,62 +163,81 @@ export default function LLMSettingsCard({ onConfigSaved }: Props) {
                 </small>
               )}
             </label>
-
-            <label className="field">
-              <span>Temperature（0–2）</span>
-              <input
-                type="number"
-                min={0}
-                max={2}
-                step={0.05}
-                value={temperature}
-                onChange={(event) => setTemperature(Number(event.target.value))}
-              />
-            </label>
-
-            <label className="field">
-              <span>Max tokens</span>
-              <input
-                type="number"
-                min={64}
-                max={32768}
-                step={64}
-                value={maxTokens}
-                onChange={(event) => setMaxTokens(Number(event.target.value))}
-              />
-            </label>
-
-            <label className="field">
-              <span>超时时间（秒）</span>
-              <input
-                type="number"
-                min={5}
-                max={300}
-                step={5}
-                value={timeout}
-                onChange={(event) => setTimeoutSeconds(Number(event.target.value))}
-              />
-            </label>
-
-            <label className="field">
-              <span>回复时的思考（DeepSeek）</span>
-              <select
-                value={replyThinking}
-                onChange={(event) =>
-                  setReplyThinking(event.target.value as LLMConfig["reply_thinking"])
-                }
-              >
-                <option value="auto">自动：平时关闭，要查资料/读文件/看屏幕时开低（默认）</option>
-                <option value="off">关闭：最快，偶尔该查资料时不查</option>
-                <option value="low">低：稍慢，总会按需查资料</option>
-                <option value="high">高：最慢，回答更周全</option>
-              </select>
-            </label>
           </div>
-          <p className="chat-hint">
-            只影响对话、语音通话和看屏点评；记忆整理、战报、游戏知识等后台任务不受影响。思考开着时
-            Temperature 不生效。
-          </p>
+          <details className="settings-more">
+            <summary>高级：地址、模型、回复思考与参数</summary>
+            <div className="form-grid">
+              <label className="field">
+                <span>Base URL</span>
+                <input
+                  value={baseUrl}
+                  onChange={(event) => setBaseUrl(event.target.value)}
+                  placeholder="https://api.deepseek.com"
+                  disabled={provider === "mock"}
+                />
+              </label>
+              <label className="field">
+                <span>Model</span>
+                <input
+                  value={model}
+                  onChange={(event) => setModel(event.target.value)}
+                  placeholder="deepseek-v4-flash"
+                  disabled={provider === "mock"}
+                />
+              </label>
+              <label className="field">
+                <span>回复时的思考（DeepSeek）</span>
+                <select
+                  value={replyThinking}
+                  onChange={(event) =>
+                    setReplyThinking(event.target.value as LLMConfig["reply_thinking"])
+                  }
+                >
+                  <option value="auto">自动：平时关闭，要查资料/读文件/看屏幕时开低（默认）</option>
+                  <option value="off">关闭：最快，偶尔该查资料时不查</option>
+                  <option value="low">低：稍慢，总会按需查资料</option>
+                  <option value="high">高：最慢，回答更周全</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Temperature（0–2）</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={2}
+                  step={0.05}
+                  value={temperature}
+                  onChange={(event) => setTemperature(Number(event.target.value))}
+                />
+              </label>
+              <label className="field">
+                <span>Max tokens</span>
+                <input
+                  type="number"
+                  min={64}
+                  max={32768}
+                  step={64}
+                  value={maxTokens}
+                  onChange={(event) => setMaxTokens(Number(event.target.value))}
+                />
+              </label>
+              <label className="field">
+                <span>超时时间（秒）</span>
+                <input
+                  type="number"
+                  min={5}
+                  max={300}
+                  step={5}
+                  value={timeout}
+                  onChange={(event) => setTimeoutSeconds(Number(event.target.value))}
+                />
+              </label>
+            </div>
+            <p className="chat-hint">
+              只影响对话、语音通话和看屏点评；记忆整理、战报、游戏知识等后台任务不受影响。思考开着时
+              Temperature 不生效。
+            </p>
+          </details>
 
           <div className="settings-actions">
             <button className="small-button" onClick={() => void test()} disabled={testing}>

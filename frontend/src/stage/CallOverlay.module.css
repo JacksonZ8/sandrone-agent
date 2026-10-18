@@ -1,0 +1,17 @@
+.ended {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--ink-2);
+}
+
+.ended p {
+  margin: 0;
+}
+
+.ended a {
+  color: var(--accent-ink);
+}

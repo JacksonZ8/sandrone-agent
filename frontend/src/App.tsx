@@ -1,5 +1,6 @@
 import { useState } from "react";
 import AppShell from "./app/AppShell";
+import { isCallOverlay } from "./app/native";
 import { useRoute } from "./app/route";
 import { statusText, useAppState } from "./app/useAppState";
 import ChatScreen from "./chat/ChatScreen";
@@ -11,17 +12,22 @@ import MemoryScreen from "./screens/MemoryScreen";
 import WallpaperScreen from "./screens/WallpaperScreen";
 import { shouldShowLaunch } from "./stage/launch";
 import LaunchSplash from "./stage/LaunchSplash";
+import CallOverlay from "./stage/CallOverlay";
 
 export default function App() {
+  return isCallOverlay() ? <CallOverlay /> : <MainApp />;
+}
+
+function MainApp() {
   const [route, navigate] = useRoute();
   const { state, error, refresh } = useAppState();
-  const [launching, setLaunching] = useState(shouldShowLaunch);
+  const [launching, setLaunching] = useState(() => shouldShowLaunch());
   const status = statusText(state, error);
   const refreshState = () => void refresh();
 
   return (
     <>
-      <AppShell route={route} navigate={navigate} status={status}>
+      <AppShell route={route} navigate={navigate} status={status} online={Boolean(state) && !error}>
         {route === "chat" && <ChatScreen appState={state} onStateChange={refreshState} />}
         {route === "her" && <HerScreen appState={state} navigate={navigate} />}
         {route === "memory" && <MemoryScreen onMemoryChange={refreshState} />}

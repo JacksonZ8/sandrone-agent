@@ -1,10 +1,18 @@
 .page {
-  width: min(100% - 28px, 560px);
-  margin: 0 auto;
-  padding: 10px 0 32px;
-  display: flex;
-  flex-direction: column;
+  composes: page from "../ui/ui.module.css";
   gap: 12px;
+}
+
+.rowIcon {
+  flex: 0 0 auto;
+  color: var(--ink-3);
+}
+
+/* 宽屏左侧常驻侧栏已有这些入口 */
+@media (min-width: 1000px) {
+  .more {
+    display: none;
+  }
 }
 
 .profile {

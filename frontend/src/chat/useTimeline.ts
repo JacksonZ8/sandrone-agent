@@ -37,23 +37,27 @@ export function useTimeline() {
     };
   }, []);
 
+  // 拉取最新几十条，按 id 追加没见过的（微信、主动消息、桌面通话里的对话）
+  const refresh = useCallback(async () => {
+    try {
+      const rows = await api.getMessages(30);
+      setMessages((current) => {
+        const lastId = current.length ? current[current.length - 1].id : 0;
+        const fresh = rows.filter((row) => row.id > lastId);
+        return fresh.length ? [...current, ...fresh] : current;
+      });
+    } catch {
+      // 后台刷新失败不打断当前对话。
+    }
+  }, []);
+
   useEffect(() => {
     if (loading) return;
-    const timer = window.setInterval(async () => {
-      if (document.visibilityState !== "visible") return;
-      try {
-        const rows = await api.getMessages(30);
-        setMessages((current) => {
-          const lastId = current.length ? current[current.length - 1].id : 0;
-          const fresh = rows.filter((row) => row.id > lastId);
-          return fresh.length ? [...current, ...fresh] : current;
-        });
-      } catch {
-        // 后台刷新失败不打断当前对话。
-      }
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
     }, POLL_MS);
     return () => window.clearInterval(timer);
-  }, [loading]);
+  }, [loading, refresh]);
 
   const loadOlder = useCallback(async () => {
     if (loadingOlder.current) return;
@@ -89,5 +93,5 @@ export function useTimeline() {
     setMessages((current) => current.filter((item) => item.id !== id));
   }, []);
 
-  return { messages, loading, hasMore, error, loadOlder, append, patch, remove };
+  return { messages, loading, hasMore, error, loadOlder, append, patch, remove, refresh };
 }

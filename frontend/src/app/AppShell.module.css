@@ -2,7 +2,43 @@
   height: 100%;
   height: 100dvh;
   display: flex;
+}
+
+/* 宽屏常驻侧栏：一块贴边留白的玻璃；窄屏隐藏，改由顶栏菜单打开抽屉 */
+.rail {
+  display: none;
+  flex: 0 0 264px;
+  margin: 12px 0 12px 12px;
+  border-radius: var(--radius-sheet);
+  background: rgba(var(--glass-rgb), calc(var(--glass-alpha) * 0.8));
+  box-shadow:
+    inset 0 0 0 1px var(--ring),
+    var(--shadow-lift);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  overflow: hidden;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   flex-direction: column;
+}
+
+@media (min-width: 1000px) {
+  .rail {
+    display: block;
+  }
+
+  /* 侧栏已经有菜单、返回与头像入口 */
+  .narrowOnly {
+    display: none !important;
+  }
+
+  .drawerScrim {
+    display: none;
+  }
 }
 
 .header {
@@ -36,6 +72,9 @@
   font-size: 12px;
   line-height: 1.3;
   color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pageTitle {
@@ -91,41 +130,8 @@
   bottom: 8px;
   left: 8px;
   width: min(300px, 82vw);
-  padding: calc(8px + env(safe-area-inset-top)) 10px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  overflow: hidden;
   animation: slide var(--dur-base) var(--ease-out) both;
-}
-
-.drawerHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 0 8px 8px;
-}
-
-.drawerHead .brand {
-  font-size: 20px;
-}
-
-.navItem {
-  min-height: 48px;
-  padding: 0 14px;
-  display: flex;
-  align-items: center;
-  border-radius: 16px;
-  color: var(--ink);
-  text-decoration: none;
-}
-
-.navItem:hover {
-  background: var(--track);
-}
-
-.navItem[aria-current="page"] {
-  background: var(--tag);
-  color: var(--accent-ink);
 }
 
 @keyframes scrim-in {

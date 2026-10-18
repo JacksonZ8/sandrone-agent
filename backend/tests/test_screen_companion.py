@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 from PIL import Image
@@ -127,7 +129,7 @@ class CompanionTests(unittest.TestCase):
         SQLModel.metadata.create_all(self.engine)
         with Session(self.engine) as session:
             session.add(ScreenCompanionConfig(
-                id=1, enabled=True, allowed_apps='["Code"]', remark_gap_minutes=45,
+                id=1, enabled=True, remark_gap_minutes=45,
                 consent_at=datetime.now(timezone.utc),
             ))
             session.add(ToolConfig(id=1, screen_enabled=True, vision_api_key="test-key"))
@@ -171,10 +173,24 @@ class CompanionTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 update_companion_config(session, {"enabled": True})
             config = update_companion_config(
-                session, {"enabled": True, "consent": True, "allowed_apps": ["Code", " Code ", "", "Finder"]}
+                session, {"enabled": True, "consent": True, "hidden_apps": ["Discord", " Discord ", "", "1Password"]}
             )
             self.assertIsNotNone(config.consent_at)
-            self.assertEqual(json.loads(config.allowed_apps), ["Code", "Finder"])
+            self.assertEqual(json.loads(config.hidden_apps), ["Discord"])  # 密码类应用本来就永远不看，不存进可编辑名单
+
+    def test_any_app_is_watched_without_a_list(self) -> None:
+        self.desktop.front = ("Figma", 2)
+        self.desktop.windows = [_window(11, "Figma", 2)]
+        self.assertEqual(self._tick(), "observed")
+        self.assertEqual(self.desktop.captured, [11])
+
+    def test_password_apps_stay_hidden_even_with_an_empty_list(self) -> None:
+        self._config(hidden_apps="[]")  # 用户把默认不看的聊天应用都放开了
+        self.desktop.front = ("1Password", 2)
+        self.assertEqual(self._tick(), "not_allowed")
+        self.desktop.front = ("WeChat", 2)
+        self.desktop.windows = [_window(11, "WeChat", 2)]
+        self.assertEqual(self._tick(), "observed")
 
     def test_off_and_paused_do_not_look(self) -> None:
         self._config(enabled=False)
@@ -282,30 +298,39 @@ class CompanionTests(unittest.TestCase):
 
 
 class HelpScreenshotTests(unittest.TestCase):
-    """求助时的单次截图也遵守名单：设了名单就只截名单内的窗口。"""
+    """看一眼：屏幕上没有不看的应用时截整屏；有的话只截她可以看的最前面的窗口，整屏截图不会带上密码或聊天。"""
 
     def setUp(self) -> None:
         self.engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
         SQLModel.metadata.create_all(self.engine)
         self.desktop = FakeDesktop()
+        self.screen_file = Path(tempfile.mkdtemp()) / "screen.jpg"
+        self.screen_file.write_bytes(b"whole")
 
-    def _capture(self, apps: str):
+    def _capture(self):
         with Session(self.engine) as session:
-            session.add(ScreenCompanionConfig(id=1, allowed_apps=apps))
+            session.add(ScreenCompanionConfig(id=1))
             session.commit()
             with patch.object(screen_tool, "MAC_DESKTOP", self.desktop), patch.object(
-                screen_tool, "_capture_screen", side_effect=AssertionError("不应整屏截图")
+                screen_tool, "_capture_screen", return_value=self.screen_file
             ):
                 return screen_tool._capture_for_help(session)
 
-    def test_listed_window_only(self) -> None:
-        image, refusal, app, game = self._capture('["Code"]')
-        self.assertEqual((image, refusal, app, game, self.desktop.captured), (b"jpeg", "", "Code", None, [11]))
+    def test_whole_screen_when_nothing_hidden_is_open(self) -> None:
+        image, refusal, app, _ = self._capture()
+        self.assertEqual((image, refusal, app, self.desktop.captured), (b"whole", "", "Code", []))
 
-    def test_refuses_without_listed_window(self) -> None:
-        image, refusal, _, _ = self._capture('["WeChat"]')
+    def test_only_a_visible_window_when_a_hidden_app_is_open(self) -> None:
+        self.desktop.windows = [_window(31, "微信", 4), _window(11, "Code", 2)]
+        image, refusal, app, _ = self._capture()
+        self.assertEqual((image, refusal, app, self.desktop.captured), (b"jpeg", "", "Code", [11]))
+
+    def test_refuses_when_only_hidden_apps_are_open(self) -> None:
+        self.desktop.front = ("1Password", 4)
+        self.desktop.windows = [_window(31, "1Password", 4)]
+        image, refusal, _, _ = self._capture()
         self.assertIsNone(image)
-        self.assertIn("名单", refusal)
+        self.assertIn("不看", refusal)
         self.assertEqual(self.desktop.captured, [])
 
 

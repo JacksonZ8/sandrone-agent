@@ -6,7 +6,6 @@ from .tools.delegation import (
     AGENT_COMMANDS,
     AGENT_PERMISSIONS,
     _agent_cli_version,
-    _build_agent_args,
     agent_executable,
     agent_tool_public,
     run_delegate_agent,

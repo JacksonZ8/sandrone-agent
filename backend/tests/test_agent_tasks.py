@@ -16,71 +16,9 @@ from sqlmodel import Session, SQLModel, create_engine, select
 
 from app.models import AgentTask, Message, utcnow
 from app.services import agent_tasks
-from app.services.tools import delegation
+from app.services.tools import acp, delegation
 from app.services.tools.codex_threads import list_codex_threads, match_codex_thread
 from app.services.tools.config import get_tool_config
-
-CODEX_OK = (
-    '{"type":"thread.started","thread_id":"01a1-thread"}\n'
-    '{"type":"turn.started"}\n'
-    '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"pong"}}\n'
-    '{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":1}}\n'
-)
-CODEX_FAILED = (
-    '{"type":"thread.started","thread_id":"01a1-thread"}\n'
-    '{"type":"item.completed","item":{"id":"item_0","type":"error","message":"Model metadata not found."}}\n'
-    '{"type":"turn.failed","error":{"message":"{\\"type\\":\\"error\\",\\"status\\":400,'
-    '\\"error\\":{\\"type\\":\\"invalid_request_error\\",\\"message\\":\\"The model is not supported.\\"}}"}}\n'
-)
-
-
-class CliOutputTests(unittest.TestCase):
-    def test_codex_success_and_failure(self) -> None:
-        self.assertEqual(delegation.parse_codex_output(CODEX_OK), ("pong", "01a1-thread", ""))
-        # -o 文件里的最终回复优先
-        self.assertEqual(delegation.parse_codex_output(CODEX_OK, "pong!\n")[0], "pong!")
-        reply, thread_id, error = delegation.parse_codex_output(CODEX_FAILED)
-        self.assertEqual((reply, thread_id), ("", "01a1-thread"))
-        self.assertEqual(error, "The model is not supported.")
-
-    def test_claude_json(self) -> None:
-        ok = json.dumps({"type": "result", "is_error": False, "result": "pong", "session_id": "s-1"})
-        self.assertEqual(delegation.parse_claude_output(ok), ("pong", "s-1", ""))
-        failed = json.dumps({"type": "result", "subtype": "error_max_budget_usd", "is_error": True, "session_id": "s-1"})
-        self.assertEqual(delegation.parse_claude_output(failed), ("", "s-1", "error_max_budget_usd"))
-        self.assertEqual(delegation.parse_claude_output("plain text"), ("plain text", "", ""))
-
-    def test_args_keep_sessions_and_resume(self) -> None:
-        build = delegation._build_agent_args
-        codex = build("codex", "/bin/codex", "do it", "/p", "readonly", "5.00", output_file="/tmp/o")
-        self.assertEqual(codex[:3], ["/bin/codex", "exec", "--json"])
-        self.assertNotIn("--ephemeral", codex)
-        self.assertIn("read-only", codex)
-        self.assertEqual(codex[-3:], ["-o", "/tmp/o", "do it"])
-        resumed = build("codex", "/bin/codex", "go on", "/p", "write", "5.00", resume_session_id="t-1")
-        self.assertEqual(resumed[:4], ["/bin/codex", "exec", "resume", "t-1"])
-        self.assertIn('sandbox_mode="workspace-write"', resumed)
-        self.assertNotIn("--cd", resumed)
-        claude = build("claude", "/bin/claude", "do it", "/p", "readonly", "5.00", new_session_id="s-1")
-        self.assertNotIn("--no-session-persistence", claude)
-        self.assertEqual(claude[claude.index("--session-id") + 1], "s-1")
-        claude_resume = build("claude", "/bin/claude", "go on", "/p", "readonly", "5.00", resume_session_id="s-1")
-        self.assertEqual(claude_resume[claude_resume.index("--resume") + 1], "s-1")
-        self.assertNotIn("--session-id", claude_resume)
-
-    def test_execute_agent_resumes_and_reports_session(self) -> None:
-        config = type("C", (), {"agent_max_budget_usd": 5.0, "agent_timeout_seconds": 60, "agent_max_output_chars": 100})()
-        target = {"command": "codex", "exe": "/bin/codex", "cwd": "/tmp", "permission": "readonly"}
-        with patch.object(delegation, "_run_process", return_value=(0, CODEX_OK, "")) as run:
-            result = delegation.execute_agent(target, "go on", config, resume_session_id="01a1-thread")
-        self.assertEqual(run.call_args.args[0][:4], ["/bin/codex", "exec", "resume", "01a1-thread"])
-        self.assertTrue(result["ok"])
-        self.assertEqual((result["output"], result["agent_session_id"]), ("pong", "01a1-thread"))
-        with patch.object(delegation, "_run_process", return_value=(1, CODEX_FAILED, "")):
-            failed = delegation.execute_agent(target, "go", config)
-        self.assertFalse(failed["ok"])
-        self.assertIn("The model is not supported.", failed["output"])
-
 
 class AgentTaskTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -99,7 +37,7 @@ class AgentTaskTests(unittest.TestCase):
             patch.object(agent_tasks, "engine", self.engine),
             # 绝不拉起本机 CLI
             patch.object(delegation, "agent_executable", side_effect=lambda command: f"/usr/local/bin/{command}"),
-            patch.object(delegation, "_run_process", side_effect=AssertionError("tests must not spawn CLIs")),
+            patch.object(acp, "run_acp_task", side_effect=AssertionError("tests must not spawn agents")),
         ]
         for item in self.patches:
             item.start()

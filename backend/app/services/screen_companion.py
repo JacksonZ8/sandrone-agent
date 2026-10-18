@@ -1,6 +1,6 @@
 """看屏 · 陪着看（原“陪你用电脑”M14 与“陪你玩游戏”M15 的观察循环）：只读、低频地看窗口，多数时候安静，偶尔说一句。
 
-两种开法：设置里常开（看名单内的应用和建过档的游戏），或语音说“这局陪我看着”临时开一段时间
+两种开法：设置里常开（看你正在用的应用，不看的应用除外），或语音说“这局陪我看着”临时开一段时间
 （watch_screen，只看开始时前台的应用，到点自动结束）。两种都需要用户先在设置里同意截图外发。
 每隔几分钟检查一次：前台应用在看的范围里、人没有离开、窗口内容确实变了，才截这一个窗口交给视觉模型概括；
 概括（不含截图）存 7 天，进入她和你对话时的上下文。前台是游戏时按游戏场景处理（见 games/play.py），
@@ -105,8 +105,28 @@ def _app_list(raw: str) -> list[str]:
     return [str(item) for item in value if isinstance(item, str) and item.strip()] if isinstance(value, list) else []
 
 
-def allowed_apps(session: Session) -> set[str]:
-    return set(_app_list(get_companion_config(session).allowed_apps))
+# 永远不看：密码与钥匙串、系统设置，以及桑多涅自己的窗口
+ALWAYS_HIDDEN_APPS = frozenset({
+    "1Password", "1Password 7", "1Password 8", "Bitwarden", "KeePassXC", "Dashlane", "LastPass", "Enpass",
+    "Keychain Access", "钥匙串访问", "Passwords", "密码",
+    "System Settings", "系统设置", "System Preferences", "系统偏好设置", "SecurityAgent", "loginwindow",
+    "Sandrone", "桑多涅",
+})
+# 默认不看、可以在设置里放开：聊天、邮件、支付
+DEFAULT_HIDDEN_APPS = (
+    "微信", "WeChat", "QQ", "Messages", "信息", "Telegram", "WhatsApp", "Signal", "Mail", "邮件", "支付宝", "Alipay",
+)
+
+
+def editable_hidden_apps(config: ScreenCompanionConfig) -> list[str]:
+    """设置里可编辑的不看名单；没改过时是默认名单。"""
+    if not (config.hidden_apps or "").strip():
+        return list(DEFAULT_HIDDEN_APPS)
+    return _app_list(config.hidden_apps)
+
+
+def hidden_apps(session: Session) -> set[str]:
+    return set(ALWAYS_HIDDEN_APPS) | set(editable_hidden_apps(get_companion_config(session)))
 
 
 def _as_utc(value: datetime | None) -> datetime | None:
@@ -139,6 +159,8 @@ def start_watch(session: Session, minutes: int | None = None, *, desktop: MacDes
     app = desktop.snapshot().app
     if not app:
         return {"ok": False, "error": "没读到前台是哪个应用，没有开始。"}
+    if app in hidden_apps(session):
+        return {"ok": False, "error": f"{app} 在她不看的应用里（设置的“看屏”可以改），没有开始。"}
     minutes = max(5, min(int(minutes or WATCH_DEFAULT_MINUTES), WATCH_MAX_MINUTES))
     now = utcnow()
     config.watch_until = now + timedelta(minutes=minutes)
@@ -177,7 +199,8 @@ def companion_config_public(session: Session, config: ScreenCompanionConfig) -> 
     base_url, model, api_key = vision_settings(session, tool_config)
     return {
         "enabled": config.enabled,
-        "allowed_apps": _app_list(config.allowed_apps),
+        "hidden_apps": editable_hidden_apps(config),
+        "always_hidden_apps": sorted(ALWAYS_HIDDEN_APPS - {"Sandrone", "桑多涅", "SecurityAgent", "loginwindow"}),
         "interval_minutes": config.interval_minutes,
         "remark_gap_minutes": config.remark_gap_minutes,
         "notify": config.notify,
@@ -197,10 +220,10 @@ def update_companion_config(session: Session, data: dict[str, Any]) -> ScreenCom
     if data.get("consent") is True and config.consent_at is None:
         config.consent_at = utcnow()
     if data.get("enabled") is True and config.consent_at is None:
-        raise ValueError("开启前需要先同意把名单内应用的窗口截图发给视觉模型。")
-    if data.get("allowed_apps") is not None:
-        apps = sorted({str(app).strip() for app in data["allowed_apps"] if str(app).strip()})
-        config.allowed_apps = json.dumps(apps, ensure_ascii=False)
+        raise ValueError("开启前需要先同意把你正在用的应用窗口截图发给视觉模型。")
+    if data.get("hidden_apps") is not None:
+        apps = sorted({str(app).strip() for app in data["hidden_apps"] if str(app).strip()} - ALWAYS_HIDDEN_APPS)
+        config.hidden_apps = json.dumps(apps, ensure_ascii=False)
     for name in ("enabled", "interval_minutes", "remark_gap_minutes", "notify"):
         if data.get(name) is not None:
             setattr(config, name, data[name])
@@ -435,7 +458,7 @@ def _may_speak(session: Session, config: ScreenCompanionConfig, now: datetime) -
 @dataclass
 class CompanionStatus:
     state: str = "off"  # off / paused / not_allowed / away / no_window / watching / playing / error
-    app: str = ""  # 只在名单内应用时填写
+    app: str = ""  # 只在她看的应用时填写（不看的应用连名字都不记）
     checked_at: datetime | None = None
     seen_at: datetime | None = None
     message: str = ""
@@ -484,21 +507,24 @@ class ScreenCompanion:
             if paused and paused > now.astimezone(timezone.utc):
                 return self._set("paused")
             games = {name: game for game in list_games(session) for name in game_app_names(game)}
-            # 常开：名单内的应用与建过档的游戏；临时开：只看开始时前台的那个应用
-            apps = (set(_app_list(config.allowed_apps)) | set(games)) if config.enabled else set()
-            if watch_active(config, now):
-                apps |= set(_app_list(config.watch_apps))
+            # 常开：除了不看的应用都看；临时开：只看开始时前台的那个应用
+            hidden = hidden_apps(session)
+            temporary = set(_app_list(config.watch_apps)) if watch_active(config, now) else set()
+
+            def visible(name: str) -> bool:
+                return bool(name) and name not in hidden and (config.enabled or name in temporary)
 
             snapshot = await asyncio.to_thread(self.desktop.snapshot)
             if force:
-                # 手动“看一眼”时前台通常是网页本身：改看名单内最前面的窗口
+                # 手动“看一眼”时前台通常是设置页本身：改看它后面最前面的、她可以看的窗口
+                apps = {w.app for w in snapshot.windows if visible(w.app) and w.app != snapshot.app}
                 window = snapshot.front_window(apps)
                 if window is None:
-                    return self._set("no_window", message="屏幕上没有名单内应用的窗口。")
+                    return self._set("no_window", message="屏幕上没有她可以看的窗口。")
                 app = window.app
             else:
-                if snapshot.app not in apps:
-                    # 名单外的应用连名字都不记录
+                if not visible(snapshot.app):
+                    # 不看的应用连名字都不记录
                     return self._set("not_allowed")
                 app = snapshot.app
                 window = snapshot.front_window()

@@ -111,6 +111,11 @@ body,
   margin: 0;
 }
 
+/* 桌面通话窗口（macOS 透明窗口）里只有她，没有壁纸 */
+:root[data-overlay="call"] body {
+  background: transparent;
+}
+
 body {
   background: var(--wall-paint);
   background-attachment: fixed;
